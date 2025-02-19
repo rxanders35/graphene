@@ -1,5 +1,4 @@
-use crate::raft::raft_fabric::Snapshot;
-use crate::raft::raft_log::{LogEntry, RaftCommand};
+use super::raft_log_entry::{LogEntry, RaftCommand};
 use openraft::{declare_raft_types, BasicNode, RaftTypeConfig};
 use std::io::Cursor;
 
