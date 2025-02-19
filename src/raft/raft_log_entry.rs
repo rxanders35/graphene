@@ -7,6 +7,8 @@ use openraft::{
 pub enum RaftCommand {
     UploadRequest,
     UploadResponse,
+    RetrieveRequest,
+    RetrieveResponse,
 }
 
 #[derive(Debug)]

@@ -1,13 +1,10 @@
+use super::raft_log_entry::LogEntry;
 use openraft::storage::{LogFlushed, RaftLogStorage};
 use openraft::{LogId, OptionalSend, RaftLogReader, RaftTypeConfig, StorageError};
-
 use sled::Db;
 
-use super::raft_log_entry::LogEntry;
-
 pub struct LogStorage {
-    db: Db,
-    entries: Vec<LogEntry>,
+    pub db: Arc<Db>,
 }
 
 pub struct LogStorageReader {
