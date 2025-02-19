@@ -77,6 +77,8 @@ impl std::fmt::Display for LogEntry {
             match self.command {
                 RaftCommand::UploadRequest => "UploadRequest",
                 RaftCommand::UploadResponse => "UploadResponse",
+                RaftCommand::RetrieveRequest => "RetrieveRequest",
+                RaftCommand::RetrieveResponse => "RetrieveResponse",
             },
             self.idx,
             self.term

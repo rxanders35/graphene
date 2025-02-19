@@ -1,7 +1,7 @@
-use super::raft_log_entry::LogEntry;
 use openraft::storage::{LogFlushed, RaftLogStorage};
 use openraft::{LogId, OptionalSend, RaftLogReader, RaftTypeConfig, StorageError};
 use sled::Db;
+use std::sync::Arc;
 
 pub struct LogStorage {
     pub db: Arc<Db>,
