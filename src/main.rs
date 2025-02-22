@@ -1,6 +1,12 @@
+use raft::RawNode;
+
 mod build;
-mod raft;
+
 #[tokio::main]
 async fn main() {
-    println!("Hello, world!");
+    let cfg = raft::Config::new(0);
+    let logger = unimplemented!();
+    #[allow(unused)]
+    let raft_log = unimplemented!();
+    let node = RawNode::new(&cfg, raft_log, logger);
 }
