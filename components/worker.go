@@ -8,13 +8,15 @@ import (
 )
 
 type Worker struct {
-	needle os.File
-	idx    os.File
+	mu         sync.Mutex
+	needleFile os.File
+	idxFile    os.File
 
-	loc map[uuid.UUID]struct {
+	idx map[uuid.UUID]struct {
 		offset int64
 		size   int32
 	}
+}
 
-	mu sync.Mutex
+func newWorker(port string) (*Worker, error) {
 }
