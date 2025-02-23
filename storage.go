@@ -2,7 +2,7 @@ package main
 
 // CONSTANTS FOR NEEDLE FORMAT ON DISK
 
-// NEEDLE: MAGICNUMBER|UUID|DATA|CHECKSUM|SIZE
+// NEEDLE: MAGICNUMBER|UUID|DATA|DATA_SIZE|CHECKSUM|SIZE
 
 // Size of Needle's magic number
 var needleMagicSize uint16
@@ -21,3 +21,19 @@ var needleSizeTotal [26]byte
 
 // The Needle magic number literal
 var needleMagicVal = 0xCAFE
+
+/////////////////////////////////////
+
+// CONSTANTS FOR OBJECT INDEX ON DISK
+
+// Object ID field
+var idxObjectID [16]byte
+
+// Offset field
+var idxOffset uint64
+
+// Size field
+var idxSize uint32
+
+// The total size of the Index entry
+var idxSizeTotal [28]byte
