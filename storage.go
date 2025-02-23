@@ -10,17 +10,17 @@ const needleMagicSize = 2
 // Size of Needle's UUID
 const needleIDSize = 16
 
-// Size of Needle's internal data
-const needleDataSize = 4
+// Size of Needle
+const needleSize = 4
 
 // Size of Needle's checksum
 const needleChecksum = 4
 
 // The total size of the Needle
-const needleSizeTotal = 26
+const needleFixedOverhead = 26
 
 // The Needle magic number literal
-const needleMagicVal = 0xCAFE
+const needleMagicVal uint16 = 0xCAFE
 
 /////////////////////////////////////
 
