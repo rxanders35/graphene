@@ -8,7 +8,7 @@ import (
 func main() {
 
 	if len(os.Args) < 2 {
-		log.Fatal("make run [master||worker <port>]")
+		log.Fatal("make run [master || worker <port>]")
 	}
 
 	switch os.Args[1] {

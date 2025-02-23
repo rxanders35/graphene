@@ -20,7 +20,7 @@ const needleSize = 4
 // Size of Needle's checksum
 const needleChecksum = 4
 
-// The total size of the Needle
+// The total fixed overhead of the Needle
 const needleFixedOverhead = 26
 
 // The Needle magic number literal
