@@ -66,5 +66,5 @@ const idxExt = ".idx"
 
 /////////////////////////////////////
 
-func makeFileMame(port string) (string, string) {
+func makeFileName(port string) (string, string) {
 }
