@@ -53,16 +53,16 @@ const idxSizeTotal = 28
 /////////////////////////////////////
 
 // Data file prefix
-const dataFilePrefix = "volume_"
+const dataPref = "volume_"
 
 // Index file prefix
-const indexFilePrefix = "volume_"
+const idxPref = "volume_"
 
 // Data file suffix
-const dataFileExt = ".dat"
+const dataExt = ".dat"
 
 // Index file suffix
-const indexFileExt = ".idx"
+const idxExt = ".idx"
 
 /////////////////////////////////////
 
