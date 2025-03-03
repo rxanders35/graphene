@@ -9,8 +9,8 @@ import (
 
 type Worker struct {
 	mu         sync.Mutex
-	needleFile os.File
-	idxFile    os.File
+	needleFile *os.File
+	idxFile    *os.File
 
 	idx map[[16]byte]struct {
 		offset int64
@@ -18,7 +18,7 @@ type Worker struct {
 	}
 }
 
-func newWorker(port string) (error, *Worker) {
+func newWorker(port string) (*Worker, error) {
 	w := &Worker{}
 	w.idx = make(map[[16]byte]struct {
 		offset int64
@@ -29,40 +29,51 @@ func newWorker(port string) (error, *Worker) {
 
 	needle, err := os.OpenFile(needleFileName, 0666, os.FileMode(os.O_RDWR|os.O_APPEND|os.O_CREATE))
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
+
+	w.needleFile = needle
 
 	idxFileName := idxPref + port + idxExt
 
 	idxFile, err := os.OpenFile(idxFileName, 0666, os.FileMode(os.O_RDWR|os.O_APPEND|os.O_CREATE))
 	if err != nil {
-		return err, nil
+		needle.Close()
+		return nil, err
 	}
 
-	ifs, err := os.Stat(idxFileName)
+	w.idxFile = idxFile
+
+	ifs, err := w.idxFile.Stat()
+	if err != nil {
+		w.Close()
+		return nil, err
+	}
 
 	if ifs.Size()%idxSizeTotal != 0 {
 		log.Print("corrupt idx file")
-		return err, nil
+		w.Close()
+		return nil, err
 	}
 
 	var n int
-	var err error
 
 	numEntries := ifs.Size() / idxSizeTotal
 	for i := int64(0); i < numEntries; i++ {
 		var id [16]byte
 		n, err = idxFile.Read(id[:])
 		if err != nil || n != 16 {
+			w.Close()
 			log.Print("failed to read id")
-			return err, nil
+			return nil, err
 		}
 
 		offsetBytes := make([]byte, 8)
 		n, err = idxFile.Read(offsetBytes)
 		if err != nil || n != 8 {
+			w.Close()
 			log.Print("offset not found")
-			return err, nil
+			return nil, err
 		}
 
 		offset := int64(binary.BigEndian.Uint64(offsetBytes))
@@ -70,8 +81,9 @@ func newWorker(port string) (error, *Worker) {
 		sizeBytes := make([]byte, 4)
 		n, err = idxFile.Read(sizeBytes)
 		if err != nil || n != 4 {
+			w.Close()
 			log.Print("failed to read size")
-			return err, nil
+			return nil, err
 		}
 
 		size := int32(binary.BigEndian.Uint32(sizeBytes))
@@ -83,7 +95,23 @@ func newWorker(port string) (error, *Worker) {
 
 	}
 
-	return nil, &Worker{
-		needleFile: *needle,
+	return w, nil
+}
+
+func (w *Worker) Close() error {
+	var err1, err2 error
+
+	if w.needleFile != nil {
+		err1 = w.needleFile.Close()
 	}
+
+	if w.idxFile != nil {
+		err2 = w.idxFile.Close()
+	}
+
+	if err1 != nil {
+		return err1
+	}
+
+	return err2
 }
