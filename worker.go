@@ -18,7 +18,6 @@ type Worker struct {
 		offset int64
 		size   int32
 	}
-	currentOffset int64
 }
 
 func newWorker(port string) (*Worker, error) {
@@ -44,13 +43,6 @@ func newWorker(port string) (*Worker, error) {
 	}
 	w.idxFile = idxFile
 
-	needleInfo, err := w.needleFile.Stat()
-	if err != nil {
-		w.Close()
-		return nil, err
-	}
-	w.currentOffset = needleInfo.Size()
-
 	indexInfo, err := w.idxFile.Stat()
 	if err != nil {
 		w.Close()
@@ -64,7 +56,6 @@ func newWorker(port string) (*Worker, error) {
 	}
 
 	var n int
-
 	numEntries := indexInfo.Size() / idxSizeTotal
 	for i := int64(0); i < numEntries; i++ {
 		var id [16]byte
@@ -109,7 +100,12 @@ func (w *Worker) Store(id [16]byte, data []byte) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	offset := w.currentOffset
+	needleFileStat, err := w.needleFile.Stat()
+	if err != nil {
+		return err
+	}
+
+	offset := needleFileStat.Size()
 
 	checksum := crc32.ChecksumIEEE(data)
 
@@ -117,17 +113,15 @@ func (w *Worker) Store(id [16]byte, data []byte) error {
 
 	needle := make([]byte, needleSize)
 
-	binary.BigEndian.PutUint16(needle[0:2], needleMagicVal)
+	binary.BigEndian.PutUint16(needle[0:1], needleMagicVal)
 
-	copy(needle[2:18], id[:])
+	copy(needle[2:17], id[:])
 
-	binary.BigEndian.PutUint32(needle[18:22], uint32(len(data)))
+	binary.BigEndian.PutUint32(needle[18:21], uint32(len(data)))
 
-	copy(needle[22:22+len(data)], data)
+	copy(needle[21:21+len(data)], data)
 
-	binary.BigEndian.PutUint32(needle[22+len(data):], checksum)
-
-	w.currentOffset = offset + int64(needleSize)
+	binary.BigEndian.PutUint32(needle[21+len(data):], checksum)
 
 	n, err := w.needleFile.Write(needle)
 	if err != nil {
@@ -141,7 +135,7 @@ func (w *Worker) Store(id [16]byte, data []byte) error {
 	idxEntry := make([]byte, 28)
 	copy(idxEntry[0:16], id[:])
 	binary.BigEndian.PutUint64(idxEntry[16:24], uint64(offset))
-	binary.BigEndian.PutUint32(idxEntry[24:28], uint32(needleSize))
+	binary.BigEndian.PutUint32(idxEntry[24:28], uint32(len(data)))
 	_, err = w.idxFile.Write(idxEntry)
 	if err != nil {
 		return err
@@ -151,9 +145,17 @@ func (w *Worker) Store(id [16]byte, data []byte) error {
 		offset int64
 		size   int32
 	}{
-		offset, int32(needleSize)}
+		offset, int32(len(data))}
 
 	return nil
+}
+
+func (w *Worker) Get(id [16]byte) ([]byte, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	fileLoc := w.idx[id].offset
+
 }
 
 func (w *Worker) Close() error {
