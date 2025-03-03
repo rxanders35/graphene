@@ -15,7 +15,7 @@ const needleMagicSize = 2
 const needleIDSize = 16
 
 // Size of Needle
-const needleSize = 4
+const needleDataSize = 4
 
 // Size of Needle's checksum
 const needleChecksum = 4
