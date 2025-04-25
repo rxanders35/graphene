@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"hash/crc32"
 	"log"
 	"os"
@@ -27,7 +28,7 @@ func newWorker(port string) (*Worker, error) {
 		size   int32
 	})
 
-	needleFileName := dataPref + port + dataExt
+	needleFileName, idxFileName := makeFileName(port)
 
 	needle, err := os.OpenFile(needleFileName, 0666, os.FileMode(os.O_RDWR|os.O_APPEND|os.O_CREATE))
 	if err != nil {
@@ -35,7 +36,6 @@ func newWorker(port string) (*Worker, error) {
 	}
 	w.needleFile = needle
 
-	idxFileName := idxPref + port + idxExt
 	idxFile, err := os.OpenFile(idxFileName, 0666, os.FileMode(os.O_RDWR|os.O_APPEND|os.O_CREATE))
 	if err != nil {
 		needle.Close()
@@ -55,16 +55,15 @@ func newWorker(port string) (*Worker, error) {
 		return nil, err
 	}
 
-	var n int
 	numEntries := indexInfo.Size() / idxSizeTotal
 	for i := int64(0); i < numEntries; i++ {
-		var id [16]byte
-		n, err = idxFile.Read(id[:])
-		if err != nil || n != 16 {
+		_, err := idxFile.Seek(i*idxSizeTotal, 0)
+		if err != nil {
 			w.Close()
-			log.Print("failed to read id")
-			return nil, err
+			return nil, fmt.Errorf("failed to seek to entry %d: %w", i, err)
 		}
+		id := [16]byte{}
+		n, err := idxFile.Read(id[:])
 
 		offsetBytes := make([]byte, 8)
 		n, err = idxFile.Read(offsetBytes)
@@ -106,29 +105,24 @@ func (w *Worker) Store(id [16]byte, data []byte) error {
 	}
 
 	offset := needleFileStat.Size()
-
 	checksum := crc32.ChecksumIEEE(data)
 
 	needleSize := needleMagicSize + needleIDSize + needleDataSize + len(data) + needleChecksum
-
 	needle := make([]byte, needleSize)
 
-	binary.BigEndian.PutUint16(needle[0:1], needleMagicVal)
+	binary.BigEndian.PutUint16(needle[0:2], needleMagicVal)
 
-	copy(needle[2:17], id[:])
+	copy(needle[2:18], id[:])
+	binary.BigEndian.PutUint32(needle[18:22], uint32(len(data)))
 
-	binary.BigEndian.PutUint32(needle[18:21], uint32(len(data)))
-
-	copy(needle[21:21+len(data)], data)
-
-	binary.BigEndian.PutUint32(needle[21+len(data):], checksum)
+	copy(needle[22:22+len(data)], data)
+	binary.BigEndian.PutUint32(needle[22+len(data):], checksum)
 
 	n, err := w.needleFile.Write(needle)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to write needle: %w", err)
 	}
 	if n != needleSize {
-		log.Printf("Incomplete write: wrote %d of %d bytes", n, needleSize)
 		return errIncompleteWrite
 	}
 
@@ -144,8 +138,7 @@ func (w *Worker) Store(id [16]byte, data []byte) error {
 	w.idx[id] = struct {
 		offset int64
 		size   int32
-	}{
-		offset, int32(len(data))}
+	}{offset, int32(len(data))}
 
 	return nil
 }
@@ -154,26 +147,77 @@ func (w *Worker) Get(id [16]byte) ([]byte, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	fileLoc := w.idx[id].offset
+	entry, exists := w.idx[id]
+	if !exists {
+		return nil, errObjectNotFound
+	}
+	offset := entry.offset
+	size := entry.size
 
+	_, err := w.needleFile.Seek(offset, 0)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to seek: %w", err)
+	}
+
+	magicBytes := make([]byte, 2)
+	n, err := w.needleFile.Read(magicBytes[:])
+	if err != nil || n != 2 {
+		return nil, fmt.Errorf("failed to read magic number: %w", err)
+	}
+	if binary.BigEndian.Uint16(magicBytes[:]) != needleMagicVal {
+		return nil, fmt.Errorf("invalid needle magic number")
+	}
+
+	idBytes := make([]byte, 16)
+	n, err = w.needleFile.Read(idBytes[:])
+	if err != nil || n != 16 {
+		return nil, fmt.Errorf("failed to read Needle ID: %w", err)
+	}
+
+	sizeBytes := make([]byte, 4)
+	n, err = w.needleFile.Read(sizeBytes[:])
+	if err != nil || n != 4 {
+		return nil, fmt.Errorf("failed to read data size: %w", err)
+	}
+	s := binary.BigEndian.Uint32(sizeBytes[:])
+	if int32(s) != size {
+		return nil, errors.New("needle size mismatch")
+	}
+
+	data := make([]byte, entry.size)
+	if n, err = w.needleFile.Read(data); err != nil || n != int(entry.size) {
+		return nil, fmt.Errorf("failed to read data: %w", err)
+	}
+
+	checksumBytes := make([]byte, 4)
+	n, err = w.needleFile.Read(checksumBytes[:])
+	if err != nil || n != 4 {
+		return nil, fmt.Errorf("failed to read checksum: %w", err)
+	}
+	storedChecksum := binary.BigEndian.Uint32(checksumBytes[:])
+	checksum := crc32.ChecksumIEEE(data)
+	if checksum != storedChecksum {
+		return nil, errors.New("checksum mismatch")
+	}
+
+	return data, nil
 }
 
 func (w *Worker) Close() error {
-	var err1, err2 error
+	var errs []error
 
 	if w.needleFile != nil {
-		err1 = w.needleFile.Close()
+		if err := w.needleFile.Close(); err != nil {
+			errs = append(errs, err)
+		}
 	}
-
 	if w.idxFile != nil {
-		err2 = w.idxFile.Close()
+		if err := w.needleFile.Close(); err != nil {
+			errs = append(errs, err)
+		}
 	}
-
-	if err1 != nil {
-		return err1
-	}
-
-	return err2
+	return errors.Join(errs...)
 }
 
 var errIncompleteWrite = errors.New("incomplete write to needle file")
+var errObjectNotFound = errors.New("object not found in needle file")

@@ -6,7 +6,7 @@ package main
 
 /////////////////////////////////////
 
-// NEEDLE: MAGICNUMBER|UUID|DATA|DATA_SIZE|CHECKSUM|SIZE
+// NEEDLE: MAGICNUMBER|UUID|SIZE|DATA|CHECKSUM
 
 // Size of Needle's magic number
 const needleMagicSize = 2
@@ -66,4 +66,6 @@ const idxExt = ".idx"
 
 /////////////////////////////////////
 
-//func makeFileName(port string) (string, string) {}
+func makeFileName(port string) (string, string) {
+	return dataPref + port + dataExt, idxPref + port + idxExt
+}
