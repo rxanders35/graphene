@@ -2,13 +2,21 @@ package main
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"hash/crc32"
+	"io"
 	"log"
+	"net/http"
 	"os"
+	"strings"
 	"sync"
+
+	"github.com/google/uuid"
 )
+
+var worker *Worker
 
 type Worker struct {
 	mu         sync.Mutex
@@ -19,6 +27,15 @@ type Worker struct {
 		offset int64
 		size   int32
 	}
+}
+
+func startWorker(port string) {
+	w, err := newWorker(port)
+	if err != nil {
+		log.Fatal("Failed to start worker server")
+	}
+	worker = w
+	go worker.startHTTPServer(port)
 }
 
 func newWorker(port string) (*Worker, error) {
@@ -217,6 +234,77 @@ func (w *Worker) Close() error {
 		}
 	}
 	return errors.Join(errs...)
+}
+
+func (w *Worker) startHTTPServer(port string) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/upload", w.handleUpload)
+	mux.HandleFunc("/object/", w.handleGet)
+	err := http.ListenAndServe(":"+port, mux)
+	if err != nil {
+		log.Fatal("Failed to start HTTP server: %v", err)
+	}
+}
+
+func (w *Worker) handleUpload(rw http.ResponseWriter, req *http.Request) {
+	log.Printf("Recieved %s request to %s", req.Method, req.URL.Path)
+	if req.Method != "POST" {
+		http.Error(rw, "Only POST allowed", http.StatusMethodNotAllowed)
+	}
+
+	req.Body = http.MaxBytesReader(rw, req.Body, 10<<20)
+	defer req.Body.Close()
+	data, err := io.ReadAll(req.Body)
+	if err != nil {
+		log.Printf("Failed to read body: %v", err)
+		http.Error(rw, "Invalid req body", http.StatusBadRequest)
+	}
+
+	idBytes := uuid.New()
+	idBytes.MarshalBinary()
+
+	err = w.Store(idBytes, data)
+	if err != nil {
+		log.Printf("Failed to write needle: %v", err)
+		http.Error(rw, "Storage Error", http.StatusInternalServerError)
+	}
+
+	resp := struct{ ID string }{ID: idBytes.String()}
+	j, err := json.Marshal(resp)
+	if err != nil {
+		log.Printf("Failed to marshal JSON response: %v", err)
+		http.Error(rw, "Response error", http.StatusInternalServerError)
+	}
+
+	rw.Header().Set("Content-Type", "applicaton/json")
+	rw.WriteHeader(http.StatusCreated)
+
+	_, err = rw.Write(j)
+	if err != nil {
+		log.Printf("JSON Write failed: %v", err)
+	}
+
+	log.Printf("Stored object: %s with size: %d", idBytes.String, len(data))
+
+}
+
+func (w *Worker) handleGet(rw http.ResponseWriter, req *http.Request) {
+	log.Printf("Request method: %s to: %s", req.Method, req.URL.Path)
+	if req.Method != "GET" {
+		http.Error(rw, "Only GET allowed", http.StatusMethodNotAllowed)
+	}
+
+	id := strings.TrimPrefix(req.URL.Path, "/object/")
+	if len(id) == 0 || id == "/" {
+		http.Error(rw, "No ID present", http.StatusBadRequest)
+	}
+
+	u, err := uuid.Parse(id)
+	if err != nil {
+		http.Error(rw, "Invalid ID format", http.StatusBadRequest)
+	}
+	u.MarshalBinary()
+
 }
 
 var errIncompleteWrite = errors.New("incomplete write to needle file")

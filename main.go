@@ -17,7 +17,7 @@ func main() {
 	case "worker":
 		if len(os.Args) < 3 {
 			log.Fatal("Worker requires port")
-			//startWorker(os.Args[2])
+			startWorker(os.Args[2])
 		}
 	}
 }
