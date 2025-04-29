@@ -52,11 +52,8 @@ const idxSizeTotal = 28
 
 /////////////////////////////////////
 
-// Data file prefix
-const dataPref = "volume_"
-
-// Index file prefix
-const idxPref = "volume_"
+// Volume server classification
+const volume = "volume_"
 
 // Data file suffix
 const dataExt = ".dat"
@@ -64,8 +61,5 @@ const dataExt = ".dat"
 // Index file suffix
 const idxExt = ".idx"
 
-/////////////////////////////////////
-
-func makeFileName(port string) (string, string) {
-	return dataPref + port + dataExt, idxPref + port + idxExt
-}
+// Directory
+const dataDir = "data/"

@@ -10,8 +10,11 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -32,10 +35,15 @@ type Worker struct {
 func startWorker(port string) {
 	w, err := newWorker(port)
 	if err != nil {
-		log.Fatal("Failed to start worker server")
+		log.Fatal("Failed to start worker server (line 37)")
 	}
 	worker = w
-	go worker.startHTTPServer(port)
+	defer w.Close()
+	log.Print("Starting server")
+	go worker.initHTTP(port)
+	for {
+		time.Sleep(2 * time.Second)
+	}
 }
 
 func newWorker(port string) (*Worker, error) {
@@ -45,23 +53,38 @@ func newWorker(port string) (*Worker, error) {
 		size   int32
 	})
 
-	needleFileName, idxFileName := makeFileName(port)
-
-	needle, err := os.OpenFile(needleFileName, 0666, os.FileMode(os.O_RDWR|os.O_APPEND|os.O_CREATE))
+	err := os.MkdirAll(dataDir, 0755)
 	if err != nil {
+		log.Printf("Created dir: %v", err)
+		return nil, err
+	}
+
+	needleFileName := filepath.Join(dataDir, volume+port+dataExt)
+	idxFileName := filepath.Join(dataDir, volume+port+idxExt)
+
+	log.Print("Using files " + needleFileName + " and " + idxFileName)
+
+	log.Print("Opening " + "data/" + needleFileName)
+
+	needle, err := os.OpenFile(needleFileName, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0664)
+	if err != nil {
+		log.Printf("Error specifically caused by: %v", err)
 		return nil, err
 	}
 	w.needleFile = needle
 
-	idxFile, err := os.OpenFile(idxFileName, 0666, os.FileMode(os.O_RDWR|os.O_APPEND|os.O_CREATE))
+	log.Print("Opening " + idxFileName)
+	idx, err := os.OpenFile(needleFileName, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0664)
 	if err != nil {
-		needle.Close()
+		log.Printf("Error specifically caused by: %v", err)
 		return nil, err
 	}
-	w.idxFile = idxFile
+	w.idxFile = idx
 
+	log.Print("retrieving index file info: " + idxFileName)
 	indexInfo, err := w.idxFile.Stat()
 	if err != nil {
+		log.Print("Failed to retrieve info")
 		w.Close()
 		return nil, err
 	}
@@ -73,17 +96,18 @@ func newWorker(port string) (*Worker, error) {
 	}
 
 	numEntries := indexInfo.Size() / idxSizeTotal
+	log.Print("Now attempting to read the needle file")
 	for i := int64(0); i < numEntries; i++ {
-		_, err := idxFile.Seek(i*idxSizeTotal, 0)
+		_, err := idx.Seek(i*idxSizeTotal, 0)
 		if err != nil {
 			w.Close()
 			return nil, fmt.Errorf("failed to seek to entry %d: %w", i, err)
 		}
 		id := [16]byte{}
-		n, err := idxFile.Read(id[:])
+		n, err := idx.Read(id[:])
 
 		offsetBytes := make([]byte, 8)
-		n, err = idxFile.Read(offsetBytes)
+		n, err = idx.Read(offsetBytes)
 		if err != nil || n != 8 {
 			w.Close()
 			log.Print("offset not found")
@@ -93,7 +117,7 @@ func newWorker(port string) (*Worker, error) {
 		offset := int64(binary.BigEndian.Uint64(offsetBytes))
 
 		sizeBytes := make([]byte, 4)
-		n, err = idxFile.Read(sizeBytes)
+		n, err = idx.Read(sizeBytes)
 		if err != nil || n != 4 {
 			w.Close()
 			log.Print("failed to read size")
@@ -236,7 +260,8 @@ func (w *Worker) Close() error {
 	return errors.Join(errs...)
 }
 
-func (w *Worker) startHTTPServer(port string) {
+func (w *Worker) initHTTP(port string) {
+	log.Print("calling from within initHTTP")
 	mux := http.NewServeMux()
 	mux.HandleFunc("/upload", w.handleUpload)
 	mux.HandleFunc("/object/", w.handleGet)
@@ -299,12 +324,27 @@ func (w *Worker) handleGet(rw http.ResponseWriter, req *http.Request) {
 		http.Error(rw, "No ID present", http.StatusBadRequest)
 	}
 
-	u, err := uuid.Parse(id)
+	uuid, err := uuid.Parse(id)
 	if err != nil {
 		http.Error(rw, "Invalid ID format", http.StatusBadRequest)
 	}
-	u.MarshalBinary()
+	uuid.MarshalBinary()
+	data, err := w.Get(uuid)
+	if errors.Is(err, errObjectNotFound) {
+		http.Error(rw, "Object not found", http.StatusInternalServerError)
+	}
+	if err != nil {
+		log.Printf("Get failed:  %v", err)
+		return
+	}
 
+	rw.Header().Set("Content-Length", strconv.Itoa(len(data)))
+
+	_, err = rw.Write(data)
+	if err != nil {
+		log.Printf("Write failed: %v", err)
+	}
+	log.Printf("Retrieved object: %s successfully", uuid.String())
 }
 
 var errIncompleteWrite = errors.New("incomplete write to needle file")
