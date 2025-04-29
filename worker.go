@@ -19,6 +19,8 @@ import (
 	"github.com/google/uuid"
 )
 
+var errObjectNotFound = errors.New("object not found in needle file")
+
 var worker *Worker
 
 type Worker struct {
@@ -132,7 +134,6 @@ func newWorker(port string) (*Worker, error) {
 		}{offset, size}
 
 	}
-
 	return w, nil
 }
 
@@ -164,7 +165,7 @@ func (w *Worker) Store(id [16]byte, data []byte) error {
 		return fmt.Errorf("failed to write needle: %w", err)
 	}
 	if n != needleSize {
-		return errIncompleteWrite
+		return errors.New("incomplete write to needle file")
 	}
 
 	idxEntry := make([]byte, 28)
@@ -347,5 +348,27 @@ func (w *Worker) handleGet(rw http.ResponseWriter, req *http.Request) {
 	log.Printf("Retrieved object: %s successfully", uuid.String())
 }
 
-var errIncompleteWrite = errors.New("incomplete write to needle file")
-var errObjectNotFound = errors.New("object not found in needle file")
+func encodeMessage(msgType byte, payload []byte) []byte {
+	msgLength := uint32(msgTypeSize + len(payload))
+	buf := make([]byte, msgSize+msgLength)
+	binary.BigEndian.PutUint32(buf[:msgSize], msgLength)
+	buf[4] = msgType
+	copy(buf[5:], payload)
+	return buf
+}
+
+func decodeMessage(r io.Reader) (msgType byte, payload []byte, err error) {
+	lenBuf := make([]byte, 4)
+	if _, err = io.ReadFull(r, lenBuf); err != nil {
+		return 0, nil, err
+	}
+	length := binary.BigEndian.Uint32(lenBuf)
+
+	buf := make([]byte, length)
+	if _, err = io.ReadFull(r, buf); err != nil {
+		return 0, nil, err
+	}
+	t := buf[0]
+	p := buf[1:]
+	return t, p, nil
+}

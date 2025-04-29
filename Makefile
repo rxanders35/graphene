@@ -6,4 +6,4 @@ run: build
 	./bin/fs
 
 test:
-	@o test ./... -v
+	o test ./... -v
