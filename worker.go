@@ -8,18 +8,20 @@ import (
 	"hash/crc32"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/google/uuid"
 )
 
 var errObjectNotFound = errors.New("object not found in needle file")
+
+const TCPport = "80811"
 
 var worker *Worker
 
@@ -37,15 +39,13 @@ type Worker struct {
 func startWorker(port string) {
 	w, err := newWorker(port)
 	if err != nil {
-		log.Fatal("Failed to start worker server (line 37)")
+		log.Fatal("Failed to start worker server (line 41)")
 	}
 	worker = w
 	defer w.Close()
 	log.Print("Starting server")
 	go worker.initHTTP(port)
-	for {
-		time.Sleep(2 * time.Second)
-	}
+	go worker.initTCP(port)
 }
 
 func newWorker(port string) (*Worker, error) {
@@ -348,6 +348,80 @@ func (w *Worker) handleGet(rw http.ResponseWriter, req *http.Request) {
 	log.Printf("Retrieved object: %s successfully", uuid.String())
 }
 
+func (w *Worker) initTCP(port string) {
+	w.listenAndAccept(port)
+}
+
+func (w *Worker) listenAndAccept(port string) {
+	listener, err := net.Listen("tcp", ":"+TCPport)
+	if err != nil {
+		log.Fatalf("Failed to init listener on port %s due to: %v", TCPport, err)
+	}
+	defer listener.Close()
+	log.Printf("TCP starting on port: %s", TCPport)
+
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			log.Printf("Failed to accept due to: %v", err)
+		}
+		go w.handleTCPConn(conn)
+	}
+}
+
+func (w *Worker) handleTCPConn(c net.Conn) {
+	defer c.Close()
+	log.Printf("New TCP connection from: %v", c.RemoteAddr())
+r:
+	for {
+		msgType, payload, err := decodeMessage(c)
+		if err != nil {
+			log.Printf("Failed to decode msg: %v", err)
+			break
+		}
+		switch msgType {
+		case registerMsg:
+			log.Printf("Recieved message: REGISTER from: %v", c.RemoteAddr())
+			r := encodeSuccess("OK")
+			if _, err := c.Write(r); err != nil {
+				log.Printf("Failed to write response: %v", err)
+				break r
+			}
+
+		case storeMsg:
+			log.Printf("Received message: STORE payload size: %v", len(payload))
+			r := encodeSuccess("OK")
+			if len(payload) < 16 {
+				log.Printf("Invalid payload with size: %v", len(payload))
+				e := encodeSuccess("Invalid Payload")
+				if _, err := c.Write(e); err != nil {
+					log.Printf("Failed to write response: %v", err)
+					break r
+				}
+			}
+
+			uuid := [16]byte{}
+			copy(uuid[:16], payload[:])
+			data := payload[16:]
+			err := w.Store(uuid, data)
+			if err != nil {
+				log.Printf("Failed to write data to volume server: %v", err)
+				e := encodeSuccess("Failed to write data to volume server.")
+				if _, err := c.Write(e); err != nil {
+					log.Printf("Failed to write response: %v", err)
+					break r
+				}
+			}
+			if _, err := c.Write(r); err != nil {
+				log.Printf("Failed to write response: %v", err)
+				break r
+			}
+		default:
+			log.Printf("Unknown msg type: %v", msgType)
+		}
+	}
+}
+
 func encodeMessage(msgType byte, payload []byte) []byte {
 	msgLength := uint32(msgTypeSize + len(payload))
 	buf := make([]byte, msgSize+msgLength)
@@ -371,4 +445,24 @@ func decodeMessage(r io.Reader) (msgType byte, payload []byte, err error) {
 	t := buf[0]
 	p := buf[1:]
 	return t, p, nil
+}
+
+func encodeRegister(addr string) []byte {
+	payload := []byte(addr)
+	p := encodeMessage(registerMsg, payload)
+	return p
+}
+
+func encodeStore(uuid [16]byte, data []byte) []byte {
+	payload := make([]byte, 16+len(data))
+	copy(payload[:16], uuid[:])
+	copy(payload[16:], data)
+	p := encodeMessage(storeMsg, payload)
+	return p
+}
+
+func encodeSuccess(resp string) []byte {
+	payload := []byte(resp)
+	p := encodeMessage(successMsg, payload)
+	return p
 }

@@ -1,9 +1,9 @@
 package main
 
 const (
-	register    = 1
-	store       = 2
-	success     = 3
+	registerMsg = 1
+	storeMsg    = 2
+	successMsg  = 3
 	msgSize     = 4
 	msgTypeSize = 1
 )
