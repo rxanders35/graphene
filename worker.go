@@ -21,8 +21,6 @@ import (
 
 var errObjectNotFound = errors.New("object not found in needle file")
 
-const TCPport = "80811"
-
 var worker *Worker
 
 type Worker struct {
@@ -39,13 +37,14 @@ type Worker struct {
 func startWorker(port string) {
 	w, err := newWorker(port)
 	if err != nil {
-		log.Fatal("Failed to start worker server (line 41)")
+		log.Fatal("Failed to start worker server")
 	}
 	worker = w
 	defer w.Close()
 	log.Print("Starting server")
 	go worker.initHTTP(port)
 	go worker.initTCP(port)
+	select {}
 }
 
 func newWorker(port string) (*Worker, error) {
@@ -353,12 +352,12 @@ func (w *Worker) initTCP(port string) {
 }
 
 func (w *Worker) listenAndAccept(port string) {
-	listener, err := net.Listen("tcp", ":"+TCPport)
+	listener, err := net.Listen("tcp", ":8082")
 	if err != nil {
-		log.Fatalf("Failed to init listener on port %s due to: %v", TCPport, err)
+		log.Fatalf("Failed to init listener on port %s due to: %v", ":8082", err)
 	}
 	defer listener.Close()
-	log.Printf("TCP starting on port: %s", TCPport)
+	log.Printf("TCP starting on port: %s", ":8082")
 
 	for {
 		conn, err := listener.Accept()
@@ -372,7 +371,7 @@ func (w *Worker) listenAndAccept(port string) {
 func (w *Worker) handleTCPConn(c net.Conn) {
 	defer c.Close()
 	log.Printf("New TCP connection from: %v", c.RemoteAddr())
-r:
+read:
 	for {
 		msgType, payload, err := decodeMessage(c)
 		if err != nil {
@@ -385,7 +384,7 @@ r:
 			r := encodeSuccess("OK")
 			if _, err := c.Write(r); err != nil {
 				log.Printf("Failed to write response: %v", err)
-				break r
+				break read
 			}
 
 		case storeMsg:
@@ -396,7 +395,7 @@ r:
 				e := encodeSuccess("Invalid Payload")
 				if _, err := c.Write(e); err != nil {
 					log.Printf("Failed to write response: %v", err)
-					break r
+					break read
 				}
 			}
 
@@ -409,60 +408,23 @@ r:
 				e := encodeSuccess("Failed to write data to volume server.")
 				if _, err := c.Write(e); err != nil {
 					log.Printf("Failed to write response: %v", err)
-					break r
+					break read
 				}
 			}
 			if _, err := c.Write(r); err != nil {
 				log.Printf("Failed to write response: %v", err)
-				break r
+				break read
 			}
+		case pingMsg:
+			log.Print("Recieved message: PING")
+			r := encodeSuccess("PONG")
+			if _, err := c.Write(r); err != nil {
+				log.Printf("Failed to write response: %v", err)
+				break read
+			}
+
 		default:
 			log.Printf("Unknown msg type: %v", msgType)
 		}
 	}
-}
-
-func encodeMessage(msgType byte, payload []byte) []byte {
-	msgLength := uint32(msgTypeSize + len(payload))
-	buf := make([]byte, msgSize+msgLength)
-	binary.BigEndian.PutUint32(buf[:msgSize], msgLength)
-	buf[4] = msgType
-	copy(buf[5:], payload)
-	return buf
-}
-
-func decodeMessage(r io.Reader) (msgType byte, payload []byte, err error) {
-	lenBuf := make([]byte, 4)
-	if _, err = io.ReadFull(r, lenBuf); err != nil {
-		return 0, nil, err
-	}
-	length := binary.BigEndian.Uint32(lenBuf)
-
-	buf := make([]byte, length)
-	if _, err = io.ReadFull(r, buf); err != nil {
-		return 0, nil, err
-	}
-	t := buf[0]
-	p := buf[1:]
-	return t, p, nil
-}
-
-func encodeRegister(addr string) []byte {
-	payload := []byte(addr)
-	p := encodeMessage(registerMsg, payload)
-	return p
-}
-
-func encodeStore(uuid [16]byte, data []byte) []byte {
-	payload := make([]byte, 16+len(data))
-	copy(payload[:16], uuid[:])
-	copy(payload[16:], data)
-	p := encodeMessage(storeMsg, payload)
-	return p
-}
-
-func encodeSuccess(resp string) []byte {
-	payload := []byte(resp)
-	p := encodeMessage(successMsg, payload)
-	return p
 }
