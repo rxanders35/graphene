@@ -10,8 +10,8 @@ import (
 )
 
 type workerConfig struct {
-	httpAddr string
-	tcpAddr  string
+	httpAddr string `json:"http"`
+	tcpAddr  string `json:"tcp"`
 }
 
 type workerInfo struct {
@@ -39,7 +39,7 @@ func newMaster(cfgPath string) (*Master, error) {
 	if err != nil {
 		log.Fatal("File not found")
 	}
-	var payload workerConfig
+	payload := &workerConfig{}
 	err = json.Unmarshal(w, payload)
 	if err != nil {
 		log.Printf("Worker Config Unmarshalling error: %v", err)
