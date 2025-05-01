@@ -382,6 +382,7 @@ read:
 		case registerMsg:
 			log.Printf("Recieved message: REGISTER from: %v", c.RemoteAddr())
 			r := encodeSuccess("OK")
+
 			if _, err := c.Write(r); err != nil {
 				log.Printf("Failed to write response: %v", err)
 				break read
