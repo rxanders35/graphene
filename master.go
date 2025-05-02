@@ -10,8 +10,8 @@ import (
 )
 
 type workerConfig struct {
-	httpAddr string `json:"http"`
-	tcpAddr  string `json:"tcp"`
+	httpAddr string
+	tcpAddr  string
 }
 
 type workerInfo struct {
@@ -58,4 +58,35 @@ func (m *Master) selectWorker() (string, error) {
 		}
 	}
 	return "", errors.New("no alive workers")
+}
+
+func (m *Master) registerWorker(httpAddr, tcpAddr string) error {
+	conn, err := net.Dial("tcp", tcpAddr)
+	if err != nil {
+		return errors.New("Dial error when attempting register worker")
+	}
+	r := encodeRegister(httpAddr)
+	if _, err = conn.Write(r); err != nil {
+		conn.Close()
+		log.Printf("Failed to write register request: %v", err)
+	}
+	msgType, _, err := decodeMessage(conn)
+	if err != nil {
+		conn.Close()
+		log.Printf("Failed to decode register response: %v", err)
+	}
+	if msgType != successMsg {
+		conn.Close()
+		log.Printf("Invalid decode: %v", err)
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	w := &workerInfo{}
+	w.conn = conn
+	w.httpAddr = httpAddr
+	w.tcpAddr = tcpAddr
+	w.alive = true
+	m.workers[httpAddr] = *w
 }
