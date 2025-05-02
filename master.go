@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"sync"
+	"time"
 )
 
 type workerConfig struct {
@@ -22,7 +23,7 @@ type workerInfo struct {
 }
 
 type Master struct {
-	workers map[string]workerInfo
+	workers map[string]*workerInfo
 	volumes map[string]string
 	mu      sync.Mutex
 	cfgPath string
@@ -32,7 +33,7 @@ func newMaster(cfgPath string) (*Master, error) {
 	m := &Master{}
 	m.cfgPath = cfgPath
 
-	m.workers = make(map[string]workerInfo)
+	m.workers = make(map[string]*workerInfo)
 	m.volumes = make(map[string]string)
 
 	w, err := os.ReadFile("./workers.json")
@@ -46,6 +47,14 @@ func newMaster(cfgPath string) (*Master, error) {
 	}
 
 	return m, nil
+}
+
+func startMaster(cfgPath string) error {
+	m, err := newMaster(cfgPath)
+	if err != nil {
+		log.Fatalf("Failed to start the Master server: %v", err)
+	}
+
 }
 
 func (m *Master) selectWorker() (string, error) {
@@ -63,7 +72,7 @@ func (m *Master) selectWorker() (string, error) {
 func (m *Master) registerWorker(httpAddr, tcpAddr string) error {
 	conn, err := net.Dial("tcp", tcpAddr)
 	if err != nil {
-		return errors.New("Dial error when attempting register worker")
+		return errors.New("dial error when attempting register worker")
 	}
 	r := encodeRegister(httpAddr)
 	if _, err = conn.Write(r); err != nil {
@@ -83,10 +92,44 @@ func (m *Master) registerWorker(httpAddr, tcpAddr string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	w := &workerInfo{}
-	w.conn = conn
-	w.httpAddr = httpAddr
-	w.tcpAddr = tcpAddr
-	w.alive = true
-	m.workers[httpAddr] = *w
+	m.workers[httpAddr] = &workerInfo{
+		conn:     conn,
+		httpAddr: httpAddr,
+		tcpAddr:  tcpAddr,
+		alive:    true,
+	}
+
+	go m.healthCheck(httpAddr, tcpAddr)
+
+	return nil
+}
+
+func (m *Master) healthCheck(httpAddr, tcpAddr string) {
+	for {
+		time.Sleep(time.Second * 10)
+		m.mu.Lock()
+		c := m.workers[httpAddr].conn
+		p := encodePing()
+		if _, err := c.Write(p); err != nil {
+			m.workers[httpAddr].alive = false
+			err := m.registerWorker(httpAddr, tcpAddr)
+			if err != nil {
+				log.Printf("Failed to re-register worker after PING failure: %v", err)
+			}
+		}
+		msgType, payload, err := decodeMessage(c)
+		if msgType == successMsg && string(payload) == "OK" {
+			m.mu.Lock()
+			m.workers[httpAddr].alive = true
+		}
+		if err != nil {
+			m.mu.Lock()
+			m.workers[httpAddr].alive = true
+			err := m.registerWorker(httpAddr, tcpAddr)
+			if err != nil {
+				log.Printf("Failed to re-register worker after PONG failure: %v", err)
+			}
+		}
+		log.Printf("Worker current status: %v", m.workers[httpAddr].alive)
+	}
 }
