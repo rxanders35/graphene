@@ -1,9 +1,9 @@
 build:
-	rm bin/fs
-	go build -o bin/fs
+	rm bin/sss
+	go build -o bin/sss .
 
 run: build
-	./bin/fs
+	./bin/sss --port=:8081 --data-dir=/tmp/volume_data
 
 test:
-	o test ./... -v
+	go test ./... -v

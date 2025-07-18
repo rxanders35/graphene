@@ -15,8 +15,8 @@ const (
 	// Size of Needle's UUID
 	NeedleIDSize = 16
 
-	// Size of Needle
-	NeedleDataFieldSize = 4
+	// Size of Needle's blob data payload
+	NeedleDataSize = 4
 
 	// Size of Needle's checksum
 	NeedleChecksum = 4
@@ -62,7 +62,7 @@ type IndexEntry struct {
 // ///////////////////////////////////
 const (
 	// Volume server classification
-	volumeFilePrefix = "volume_"
+	VolumeFilePrefix = "volume_"
 
 	// Data file suffix
 	DataFileExtension = ".dat"
