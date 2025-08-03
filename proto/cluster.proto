@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package cluster;
+
+option go_package = "github.com/rxanders35/sss/cluster";
+
+service MasterService {
+  rpc RegisterVolume(RegisterVolumeRequest) returns (RegisterVolumeResponse);
+}
+
+message RegisterVolumeRequest {
+  bytes volume_id = 1;
+  string http_address = 2;
+}
+
+message RegisterVolumeResponse {}

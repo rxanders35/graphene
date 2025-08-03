@@ -1,3 +1,0 @@
-curl -X POST --data "my test object data" http://localhost:8081/
-
-curl http://localhost:8081/<your_object_id>
