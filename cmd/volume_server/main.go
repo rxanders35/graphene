@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	pb "github.com/rxanders35/sss/proto"
 	"github.com/rxanders35/sss/volume_server"
 )
 
@@ -53,7 +54,9 @@ func main() {
 		log.Fatalf("Couldn't init volume backend. Why: %v", err)
 	}
 
-	httpSrv, err := volume_server.NewHTTPServer(*volumeHTTPAddr, *mastergRPCAddr, volume, id)
+	m := volume_server.NewMasterClient(*mastergRPCAddr)
+
+	httpSrv, err := volume_server.NewHTTPServer(*volumeHTTPAddr, *mastergRPCAddr, volume, id, m)
 	if err != nil {
 		log.Fatalf("Couldn't init volume server. Why: %v", err)
 	}
@@ -63,6 +66,13 @@ func main() {
 			log.Fatalf("server run error. Why: %v", err)
 		}
 	}()
+
+	req := &pb.RegisterVolumeRequest{
+		HttpAddress: *volumeHTTPAddr,
+		VolumeId:    id[:],
+	}
+
+	g.client.RegisterVolume(context.Background(), req)
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)

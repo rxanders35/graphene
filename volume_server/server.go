@@ -2,14 +2,10 @@ package volume_server
 
 import (
 	"context"
-	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	pb "github.com/rxanders35/sss/proto"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 type Server struct {
@@ -22,33 +18,23 @@ type HTTPServer struct {
 	engine        *gin.Engine
 	volumeHandler VolumeHandler
 	srv           *http.Server
-	grpcClient    *GRPCclient
+	grpcClient    *MasterClient
 }
 
-func NewHTTPServer(volumeHTTPaddr, masterGRPCaddr string, v *Volume, volServerID uuid.UUID) (*HTTPServer, error) {
+func NewHTTPServer(volumeHTTPaddr, masterGRPCaddr string, v *Volume, volServerID uuid.UUID, m *MasterClient) (*HTTPServer, error) {
 	engine := gin.New()
 	engine.Use(gin.Logger(), gin.Recovery())
 
 	handler := VolumeHandler{volume: v}
+
 	h := &HTTPServer{
 		addr:          volumeHTTPaddr,
 		volume:        v,
 		engine:        engine,
 		volumeHandler: handler,
+		grpcClient:    m,
 	}
 	h.registerRoutes()
-
-	g, err := NewGRPCclient(masterGRPCaddr)
-	if err != nil {
-		log.Printf("Failed to start gRPC client. Why: %v", err)
-	}
-
-	req := &pb.RegisterVolumeRequest{
-		HttpAddress: volumeHTTPaddr,
-		VolumeId:    volServerID[:],
-	}
-
-	g.client.RegisterVolume(context.Background(), req)
 
 	return h, nil
 }
@@ -75,24 +61,4 @@ func (h *HTTPServer) Shutdown(ctx context.Context) error {
 		return nil
 	}
 	return h.srv.Shutdown(ctx)
-}
-
-type GRPCclient struct {
-	masterAddr string
-	conn       *grpc.ClientConn
-	client     pb.MasterServiceClient
-}
-
-func NewGRPCclient(m string) (*GRPCclient, error) {
-	conn, err := grpc.NewClient(m, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		log.Printf("Failed dialing master. Why: %v", err)
-	}
-
-	client := pb.NewMasterServiceClient(conn)
-	return &GRPCclient{
-		masterAddr: m,
-		conn:       conn,
-		client:     client,
-	}, nil
 }

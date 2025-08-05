@@ -2,10 +2,11 @@ syntax = "proto3";
 
 package cluster;
 
-option go_package = "github.com/rxanders35/sss/cluster";
+option go_package = "github.com/rxanders35/sss/transport";
 
 service MasterService {
   rpc RegisterVolume(RegisterVolumeRequest) returns (RegisterVolumeResponse);
+  rpc RegisterGateway(RegisterGatewayRequest) returns (RegisterGatewayResponse);
 }
 
 message RegisterVolumeRequest {
@@ -14,3 +15,9 @@ message RegisterVolumeRequest {
 }
 
 message RegisterVolumeResponse {}
+
+// make rpcs for connecting gateway to master
+
+message RegisterGatewayRequest{}
+
+message RegisterGatewayResponse{}

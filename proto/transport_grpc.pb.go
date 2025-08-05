@@ -2,9 +2,9 @@
 // versions:
 // - protoc-gen-go-grpc v1.2.0
 // - protoc             v5.29.3
-// source: proto/cluster.proto
+// source: proto/transport.proto
 
-package cluster
+package transport
 
 import (
 	context "context"
@@ -23,6 +23,7 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type MasterServiceClient interface {
 	RegisterVolume(ctx context.Context, in *RegisterVolumeRequest, opts ...grpc.CallOption) (*RegisterVolumeResponse, error)
+	RegisterGateway(ctx context.Context, in *RegisterGatewayRequest, opts ...grpc.CallOption) (*RegisterGatewayResponse, error)
 }
 
 type masterServiceClient struct {
@@ -42,11 +43,21 @@ func (c *masterServiceClient) RegisterVolume(ctx context.Context, in *RegisterVo
 	return out, nil
 }
 
+func (c *masterServiceClient) RegisterGateway(ctx context.Context, in *RegisterGatewayRequest, opts ...grpc.CallOption) (*RegisterGatewayResponse, error) {
+	out := new(RegisterGatewayResponse)
+	err := c.cc.Invoke(ctx, "/cluster.MasterService/RegisterGateway", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MasterServiceServer is the server API for MasterService service.
 // All implementations must embed UnimplementedMasterServiceServer
 // for forward compatibility
 type MasterServiceServer interface {
 	RegisterVolume(context.Context, *RegisterVolumeRequest) (*RegisterVolumeResponse, error)
+	RegisterGateway(context.Context, *RegisterGatewayRequest) (*RegisterGatewayResponse, error)
 	mustEmbedUnimplementedMasterServiceServer()
 }
 
@@ -56,6 +67,9 @@ type UnimplementedMasterServiceServer struct {
 
 func (UnimplementedMasterServiceServer) RegisterVolume(context.Context, *RegisterVolumeRequest) (*RegisterVolumeResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RegisterVolume not implemented")
+}
+func (UnimplementedMasterServiceServer) RegisterGateway(context.Context, *RegisterGatewayRequest) (*RegisterGatewayResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RegisterGateway not implemented")
 }
 func (UnimplementedMasterServiceServer) mustEmbedUnimplementedMasterServiceServer() {}
 
@@ -88,6 +102,24 @@ func _MasterService_RegisterVolume_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MasterService_RegisterGateway_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RegisterGatewayRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MasterServiceServer).RegisterGateway(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/cluster.MasterService/RegisterGateway",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MasterServiceServer).RegisterGateway(ctx, req.(*RegisterGatewayRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // MasterService_ServiceDesc is the grpc.ServiceDesc for MasterService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -99,7 +131,11 @@ var MasterService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "RegisterVolume",
 			Handler:    _MasterService_RegisterVolume_Handler,
 		},
+		{
+			MethodName: "RegisterGateway",
+			Handler:    _MasterService_RegisterGateway_Handler,
+		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "proto/cluster.proto",
+	Metadata: "proto/transport.proto",
 }
