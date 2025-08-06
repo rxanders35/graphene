@@ -2,16 +2,10 @@ package gateway
 
 import (
 	"log"
-	"sync"
 
 	pb "github.com/rxanders35/sss/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-)
-
-var (
-	instance *MasterClient
-	once     sync.Once
 )
 
 type MasterClient struct {
@@ -20,20 +14,16 @@ type MasterClient struct {
 	client     pb.MasterServiceClient
 }
 
-func NewMasterclient(m string) *MasterClient {
-	once.Do(func() {
-		conn, err := grpc.NewClient(m, grpc.WithTransportCredentials(insecure.NewCredentials()))
-		if err != nil {
-			log.Printf("Failed dialing master. Why: %v", err)
-		}
+func NewMasterclient(masterAddr string) (*MasterClient, error) {
+	conn, err := grpc.NewClient(masterAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Printf("Failed dialing master. Why: %v", err)
+	}
 
-		client := pb.NewMasterServiceClient(conn)
-		instance = &MasterClient{
-			masterAddr: m,
-			conn:       conn,
-			client:     client,
-		}
-	})
-	return instance
-
+	c := &MasterClient{
+		masterAddr: masterAddr,
+		conn:       conn,
+		client:     pb.NewMasterServiceClient(conn),
+	}
+	return c, nil
 }

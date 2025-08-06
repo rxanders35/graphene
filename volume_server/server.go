@@ -6,6 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	pb "github.com/rxanders35/sss/proto"
+	"google.golang.org/grpc"
 )
 
 type Server struct {
@@ -21,7 +23,7 @@ type HTTPServer struct {
 	grpcClient    *MasterClient
 }
 
-func NewHTTPServer(volumeHTTPaddr, masterGRPCaddr string, v *Volume, volServerID uuid.UUID, m *MasterClient) (*HTTPServer, error) {
+func NewHTTPServer(volumeHTTPaddr string, v *Volume, m *MasterClient, volServerID uuid.UUID) (*HTTPServer, error) {
 	engine := gin.New()
 	engine.Use(gin.Logger(), gin.Recovery())
 
@@ -35,6 +37,13 @@ func NewHTTPServer(volumeHTTPaddr, masterGRPCaddr string, v *Volume, volServerID
 		grpcClient:    m,
 	}
 	h.registerRoutes()
+
+	req := &pb.RegisterVolumeRequest{
+		HttpAddress: volumeHTTPaddr,
+		VolumeId:    volServerID[:],
+	}
+
+	m.Client.RegisterVolume(context.Background(), req, grpc.WaitForReady(true))
 
 	return h, nil
 }

@@ -2,8 +2,21 @@ package gateway
 
 import "github.com/gin-gonic/gin"
 
-type GatewayHandler struct{} //does this need to exist to hold a dependency?
+type GatewayHandler struct {
+	masterClient *MasterClient
+}
 
-// this is the API surface of the entire app
-func (g *GatewayHandler) Write(c *gin.Context) {}
-func (g *GatewayHandler) Read(c *gin.Context)  {}
+func NewGatewayHandler(m *MasterClient) (*GatewayHandler, error) {
+	g := &GatewayHandler{
+		masterClient: m,
+	}
+	// figure it out
+	return g, nil
+}
+
+func (g *GatewayHandler) Write(c *gin.Context) {
+
+}
+func (g *GatewayHandler) Read(c *gin.Context) {
+
+}

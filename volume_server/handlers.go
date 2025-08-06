@@ -39,5 +39,5 @@ func (v *VolumeHandler) Read(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read"})
 		return
 	}
-	c.Data(http.StatusOK, "application/octect-stream", data)
+	c.Data(http.StatusOK, "application/octet-stream", data)
 }

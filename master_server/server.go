@@ -45,6 +45,7 @@ func (g *GRPCServer) Run() {
 	}
 }
 
+// rpc
 func (g *GRPCServer) RegisterVolume(ctx context.Context, req *pb.RegisterVolumeRequest) (*pb.RegisterVolumeResponse, error) {
 	g.mu.Lock()
 	defer g.mu.Unlock()

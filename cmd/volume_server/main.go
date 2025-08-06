@@ -12,9 +12,52 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	pb "github.com/rxanders35/sss/proto"
 	"github.com/rxanders35/sss/volume_server"
 )
+
+func main() {
+	mastergRPCAddr := flag.String("master-addr", "localhost:9090", "master's grpc address")
+	volumeHTTPAddr := flag.String("volume-addr", "localhost:8080", "volume's http address")
+	dataDir := flag.String("data-dir", "./data", "volume's data namespace")
+
+	flag.Parse()
+
+	serverId, err := getOrCreateServerID(*dataDir)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	v, err := volume_server.NewVolume(*dataDir, serverId)
+	if err != nil {
+		log.Fatalf("Couldn't init volume backend. Why: %v", err)
+	}
+
+	m := volume_server.NewMasterClient(*mastergRPCAddr)
+
+	httpSrv, err := volume_server.NewHTTPServer(*volumeHTTPAddr, v, m, serverId)
+	if err != nil {
+		log.Fatalf("Couldn't init volume server. Why: %v", err)
+	}
+
+	go func() {
+		if err := httpSrv.Run(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("server run error. Why: %v", err)
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	log.Println("Shut down")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := httpSrv.Shutdown(ctx); err != nil {
+		log.Fatalf("graceful shutdown failed. Why: %v", err)
+	}
+}
 
 func getOrCreateServerID(dataDir string) (uuid.UUID, error) {
 	volumeServerIdPath := dataDir + "/volume.id"
@@ -35,55 +78,4 @@ func getOrCreateServerID(dataDir string) (uuid.UUID, error) {
 		return volumeServerId, nil
 	}
 	return uuid.Nil, fmt.Errorf("Failed reading volume.id file. Why: %v", err)
-}
-
-func main() {
-	mastergRPCAddr := flag.String("master-addr", "localhost:9090", "master's grpc address")
-	volumeHTTPAddr := flag.String("volume-addr", "localhost:8080", "volume's http address")
-	dataDir := flag.String("data-dir", "./data", "volume's data namespace")
-
-	flag.Parse()
-
-	id, err := getOrCreateServerID(*dataDir)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	volume, err := volume_server.NewVolume(*dataDir, id)
-	if err != nil {
-		log.Fatalf("Couldn't init volume backend. Why: %v", err)
-	}
-
-	m := volume_server.NewMasterClient(*mastergRPCAddr)
-
-	httpSrv, err := volume_server.NewHTTPServer(*volumeHTTPAddr, *mastergRPCAddr, volume, id, m)
-	if err != nil {
-		log.Fatalf("Couldn't init volume server. Why: %v", err)
-	}
-
-	go func() {
-		if err := httpSrv.Run(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("server run error. Why: %v", err)
-		}
-	}()
-
-	req := &pb.RegisterVolumeRequest{
-		HttpAddress: *volumeHTTPAddr,
-		VolumeId:    id[:],
-	}
-
-	g.client.RegisterVolume(context.Background(), req)
-
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
-
-	log.Println("Shut down")
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	if err := httpSrv.Shutdown(ctx); err != nil {
-		log.Fatalf("graceful shutdown failed. Why: %v", err)
-	}
 }

@@ -11,33 +11,20 @@ type GatewayServer struct {
 	addr           string
 	engine         *gin.Engine
 	srv            *http.Server
-	gatewayHandler GatewayHandler
+	gatewayHandler *GatewayHandler
 	masterClient   *MasterClient
 }
 
-func NewGatewayServer(gatewayAddr, masterGRPCaddr string) (*GatewayServer, error) {
+func NewGatewayServer(gatewayAddr string, h *GatewayHandler) (*GatewayServer, error) {
 	engine := gin.New()
 	engine.Use(gin.Logger(), gin.Recovery())
-
-	handler := GatewayHandler{} //todo
-
-	/*
-		c, err := NewGRPCclient(masterGRPCaddr)
-		if err != nil {
-			log.Printf("Failed to start gRPC client. Why: %v", err)
-		}
-	*/
 
 	g := &GatewayServer{
 		addr:           gatewayAddr,
 		engine:         engine,
-		gatewayHandler: handler,
-		// grpcClient: c,
+		gatewayHandler: h,
 	}
 	g.registerRoutes()
-
-	// figure out RPC for registering gateway
-	// c.RegisterGateway()
 
 	return g, nil
 }
