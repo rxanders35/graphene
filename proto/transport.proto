@@ -16,8 +16,9 @@ message RegisterVolumeRequest {
 message RegisterVolumeResponse {}
 
 // make rpcs for gateway client -> master
-message VolumeAddrRequest {}
+message AssignVolumeRequest {}
 
-message VolumeAddrResponse {
+message AssignVolumeResponse {
     string http_address = 1;
+    bytes volueme_id = 2;
 }

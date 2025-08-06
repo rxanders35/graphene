@@ -34,13 +34,13 @@ func main() {
 
 	m := volume_server.NewMasterClient(*mastergRPCAddr)
 
-	httpSrv, err := volume_server.NewHTTPServer(*volumeHTTPAddr, v, m, serverId)
+	s, err := volume_server.NewHTTPServer(*volumeHTTPAddr, v, m, serverId)
 	if err != nil {
 		log.Fatalf("Couldn't init volume server. Why: %v", err)
 	}
 
 	go func() {
-		if err := httpSrv.Run(); err != nil && err != http.ErrServerClosed {
+		if err := s.Run(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("server run error. Why: %v", err)
 		}
 	}()
@@ -54,28 +54,43 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	if err := httpSrv.Shutdown(ctx); err != nil {
+	if err := s.Shutdown(ctx); err != nil {
 		log.Fatalf("graceful shutdown failed. Why: %v", err)
 	}
 }
 
 func getOrCreateServerID(dataDir string) (uuid.UUID, error) {
 	volumeServerIdPath := dataDir + "/volume.id"
+
+	// Check if the path exists and is a directory
+	if info, err := os.Stat(volumeServerIdPath); err == nil && info.IsDir() {
+		return uuid.Nil, fmt.Errorf("volume.id path %s is a directory, expected a file", volumeServerIdPath)
+	}
+
+	// Try reading the file
 	idData, err := os.ReadFile(volumeServerIdPath)
 	if err == nil {
 		volumeServerId, err := uuid.FromBytes(idData)
 		if err != nil {
-			return uuid.Nil, fmt.Errorf("Failed getting volume server id. Why: %v", err)
+			return uuid.Nil, fmt.Errorf("failed parsing volume server id from %s: %v", volumeServerIdPath, err)
 		}
 		return volumeServerId, nil
 	}
 
+	// If the file doesn't exist, create a new UUID and write it
 	if os.IsNotExist(err) {
 		volumeServerId := uuid.New()
-		if writeErr := os.WriteFile(volumeServerIdPath, volumeServerId[:], 0644); writeErr != nil {
-			return uuid.Nil, fmt.Errorf("could not write new volume.id file: %w", writeErr)
+		// Ensure the directory exists
+		if err := os.MkdirAll(dataDir, 0755); err != nil {
+			return uuid.Nil, fmt.Errorf("failed to create directory %s: %v", dataDir, err)
+		}
+		// Write the UUID to the file
+		if err := os.WriteFile(volumeServerIdPath, volumeServerId[:], 0644); err != nil {
+			return uuid.Nil, fmt.Errorf("failed to write new volume.id file %s: %v", volumeServerIdPath, err)
 		}
 		return volumeServerId, nil
 	}
-	return uuid.Nil, fmt.Errorf("Failed reading volume.id file. Why: %v", err)
+
+	// Handle other errors
+	return uuid.Nil, fmt.Errorf("failed reading volume.id file %s: %v", volumeServerIdPath, err)
 }

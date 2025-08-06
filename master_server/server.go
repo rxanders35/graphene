@@ -12,19 +12,19 @@ import (
 )
 
 type GRPCServer struct {
-	port          string
+	addr          string
 	volumeServers map[uuid.UUID]string //volume server id -> addr
 	srv           *grpc.Server
 	mu            sync.Mutex
 	pb.UnimplementedMasterServiceServer
 }
 
-func NewGRPCServer(port string) *GRPCServer {
+func NewGRPCServer(addr string) *GRPCServer {
 	volumeServers := make(map[uuid.UUID]string)
 
 	s := grpc.NewServer()
 	g := &GRPCServer{
-		port:          port,
+		addr:          addr,
 		volumeServers: volumeServers,
 		srv:           s,
 	}
@@ -35,9 +35,9 @@ func NewGRPCServer(port string) *GRPCServer {
 }
 
 func (g *GRPCServer) Run() {
-	listener, err := net.Listen("tcp", g.port)
+	listener, err := net.Listen("tcp", g.addr)
 	if err != nil {
-		log.Printf("Failed to init tcp listener on port: %s. Why: %v", g.port, err)
+		log.Printf("Failed to init tcp listener on addr: %s. Why: %v", g.addr, err)
 	}
 
 	if err := g.srv.Serve(listener); err != nil {
@@ -55,6 +55,8 @@ func (g *GRPCServer) RegisterVolume(ctx context.Context, req *pb.RegisterVolumeR
 	copy(uuid[:], volumeId)
 
 	g.volumeServers[uuid] = volumeAddr
-
+	for k, v := range g.volumeServers {
+		log.Printf("Volume %s at addr %s successfully registered", k, v)
+	}
 	return &pb.RegisterVolumeResponse{}, nil
 }
