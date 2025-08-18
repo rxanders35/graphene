@@ -1,7 +1,6 @@
-### SIMPLER STORAGE SERVICE ###
+### GRAPHENE OBJECT STORE ###
 
-Designed to be a simple version of AWS S3. Upload to and retrieve files
-from a fault tolerant cluster of storage servers.
+Safely upload to and retrieve files from a blazingly fast distributed object store.
 
 (WORK IN PROGRESS)
 

@@ -6,7 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	pb "github.com/rxanders35/sss/proto"
+	pb "github.com/rxanders35/graphene/proto"
 	"google.golang.org/grpc"
 )
 

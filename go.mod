@@ -1,10 +1,11 @@
-module github.com/rxanders35/sss
+module github.com/rxanders35/graphene
 
 go 1.24.0
 
 require (
 	github.com/gin-gonic/gin v1.10.1
 	github.com/google/uuid v1.6.0
+	github.com/jmoiron/sqlx v1.4.0
 	google.golang.org/grpc v1.74.2
 	google.golang.org/protobuf v1.36.6
 )

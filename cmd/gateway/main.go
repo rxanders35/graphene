@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/rxanders35/sss/gateway"
+	"github.com/rxanders35/graphene/gateway"
 )
 
 func main() {

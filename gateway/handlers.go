@@ -11,7 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	pb "github.com/rxanders35/sss/proto"
+	pb "github.com/rxanders35/graphene/proto"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -32,12 +32,10 @@ func NewGatewayHandler(m *MasterClient) (*GatewayHandler, error) {
 }
 
 func (g *GatewayHandler) Write(c *gin.Context) {
-	// 1. Ask master for a volume assignment
 	masterReq := &pb.AssignVolumeRequest{}
 	masterResp, err := g.masterClient.client.AssignVolume(c, masterReq)
 	if err != nil {
 		log.Printf("Failed to get a volume from the master: %v", err)
-		// Translate gRPC error to HTTP status
 		st, _ := status.FromError(err)
 		if st.Code() == codes.Unavailable {
 			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "no storage volumes available"})
@@ -54,7 +52,6 @@ func (g *GatewayHandler) Write(c *gin.Context) {
 		return
 	}
 
-	// 2. Forward the client's data to the assigned volume server
 	volumeAddr := fmt.Sprintf("http://%s/v1/volume/write", masterResp.HttpAddress)
 	volumeReq, err := http.NewRequest("POST", volumeAddr, c.Request.Body)
 	if err != nil {
@@ -78,7 +75,6 @@ func (g *GatewayHandler) Write(c *gin.Context) {
 		return
 	}
 
-	// 3. Parse the NeedleID from the volume server's response
 	body, err := io.ReadAll(volumeResp.Body)
 	if err != nil {
 		log.Printf("Failed to read volume server resp: %v", err)
@@ -95,7 +91,6 @@ func (g *GatewayHandler) Write(c *gin.Context) {
 		return
 	}
 
-	// 4. Construct the fat ID and return it to the client
 	fatID := fmt.Sprintf("%s:%s", volumeId.String(), respData.ID)
 	c.JSON(http.StatusCreated, gin.H{"id": fatID})
 }
@@ -103,7 +98,6 @@ func (g *GatewayHandler) Write(c *gin.Context) {
 func (g *GatewayHandler) Read(c *gin.Context) {
 	fatID := c.Param("fat_id")
 
-	// 1. Parse the fat ID
 	parts := strings.Split(fatID, ":")
 	if len(parts) != 2 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid object id format"})
@@ -121,7 +115,6 @@ func (g *GatewayHandler) Read(c *gin.Context) {
 		return
 	}
 
-	// 2. Ask master for the volume's location
 	masterReq := &pb.GetVolumeLocationRequest{VolumeId: volumeId[:]}
 	masterResp, err := g.masterClient.client.GetVolumeLocation(c, masterReq)
 	if err != nil {
@@ -135,7 +128,6 @@ func (g *GatewayHandler) Read(c *gin.Context) {
 		return
 	}
 
-	// 3. Request the object from the volume server and stream it back
 	volumeAddr := fmt.Sprintf("http://%s/v1/volume/read/%s", masterResp.HttpAddress, needleIdStr)
 	volumeResp, err := g.httpClient.Get(volumeAddr)
 	if err != nil {
@@ -145,6 +137,5 @@ func (g *GatewayHandler) Read(c *gin.Context) {
 	}
 	defer volumeResp.Body.Close()
 
-	// Stream the response directly to the client
 	c.DataFromReader(volumeResp.StatusCode, volumeResp.ContentLength, volumeResp.Header.Get("Content-Type"), volumeResp.Body, nil)
 }

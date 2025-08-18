@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	pb "github.com/rxanders35/sss/proto"
+	pb "github.com/rxanders35/graphene/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

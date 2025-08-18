@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package cluster;
+
+option go_package = "github.com/rxanders35/sss/proto";
+
+service LedgerService {
+    // requests location from the master
+    rpc PrepareWrite(PrepareWriteRequest) returns (PrepareWriteResponse);
+
+    // commits and confirms metadata pertaining to upload upon receiving object (needle) ID from volume
+    rpc Apply(ApplyRequest) returns (ApplyResponse);
+
+    // queries backend (Postgres or CockroachDB) for exact object location
+    rpc GetObjectLocation(GetObjectLocationRequest) returns (GetObjectLocationResponse);
+
+    // marks object on for garbage collection
+    // rpc DeleteObject(DeleteObjectRequest) returns (DeleteObjectResponse);
+
+    // queries a list of objects
+    // rpc ListObjects(ListObjectsRequest) returns (ListObjectsResponse);
+}
+
+message PrepareWriteRequest {
+    string bucket = 1;
+    string path = 2;
+}
+
+message PrepareUploadResponse{}
+
+message ApplyRequest {
+
+}
