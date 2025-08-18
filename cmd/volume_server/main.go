@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -17,8 +18,8 @@ import (
 
 func main() {
 	mastergRPCAddr := flag.String("master-addr", "localhost:9090", "master's grpc address")
-	volumeHTTPAddr := flag.String("volume-addr", "localhost:8080", "volume's http address")
-	dataDir := flag.String("data-dir", "./data", "volume's data namespace")
+	volumeHTTPAddr := flag.String("addr", ":8080", "volume's http address")
+	dataDir := flag.String("data-dir", "./data", "volume's data directory")
 
 	flag.Parse()
 
@@ -27,23 +28,28 @@ func main() {
 		log.Fatal(err)
 	}
 
-	v, err := volume_server.NewVolume(*dataDir, serverId)
+	volume, err := volume_server.NewVolume(*dataDir, serverId)
 	if err != nil {
 		log.Fatalf("Couldn't init volume backend. Why: %v", err)
 	}
 
-	m := volume_server.NewMasterClient(*mastergRPCAddr)
+	masterClient, err := volume_server.NewMasterClient(*mastergRPCAddr)
+	if err != nil {
+		log.Fatalf("Couldn't connect to master. Why: %v", err)
+	}
 
-	s, err := volume_server.NewHTTPServer(*volumeHTTPAddr, v, m, serverId)
+	httpSrv, err := volume_server.NewHTTPServer(*volumeHTTPAddr, volume, masterClient, serverId)
 	if err != nil {
 		log.Fatalf("Couldn't init volume server. Why: %v", err)
 	}
 
 	go func() {
-		if err := s.Run(); err != nil && err != http.ErrServerClosed {
+		if err := httpSrv.Run(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("server run error. Why: %v", err)
 		}
 	}()
+
+	log.Printf("Volume Server is running on %s", *volumeHTTPAddr)
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
@@ -54,43 +60,33 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	if err := s.Shutdown(ctx); err != nil {
+	if err := httpSrv.Shutdown(ctx); err != nil {
 		log.Fatalf("graceful shutdown failed. Why: %v", err)
 	}
 }
 
 func getOrCreateServerID(dataDir string) (uuid.UUID, error) {
-	volumeServerIdPath := dataDir + "/volume.id"
+	idPath := filepath.Join(dataDir, "volume.id")
 
-	// Check if the path exists and is a directory
-	if info, err := os.Stat(volumeServerIdPath); err == nil && info.IsDir() {
-		return uuid.Nil, fmt.Errorf("volume.id path %s is a directory, expected a file", volumeServerIdPath)
-	}
-
-	// Try reading the file
-	idData, err := os.ReadFile(volumeServerIdPath)
+	idBytes, err := os.ReadFile(idPath)
 	if err == nil {
-		volumeServerId, err := uuid.FromBytes(idData)
-		if err != nil {
-			return uuid.Nil, fmt.Errorf("failed parsing volume server id from %s: %v", volumeServerIdPath, err)
+		id, parseErr := uuid.FromBytes(idBytes)
+		if parseErr != nil {
+			return uuid.Nil, fmt.Errorf("corrupt volume.id file: %w", parseErr)
 		}
-		return volumeServerId, nil
+		return id, nil
 	}
 
-	// If the file doesn't exist, create a new UUID and write it
 	if os.IsNotExist(err) {
-		volumeServerId := uuid.New()
-		// Ensure the directory exists
 		if err := os.MkdirAll(dataDir, 0755); err != nil {
-			return uuid.Nil, fmt.Errorf("failed to create directory %s: %v", dataDir, err)
+			return uuid.Nil, fmt.Errorf("failed to create data directory: %w", err)
 		}
-		// Write the UUID to the file
-		if err := os.WriteFile(volumeServerIdPath, volumeServerId[:], 0644); err != nil {
-			return uuid.Nil, fmt.Errorf("failed to write new volume.id file %s: %v", volumeServerIdPath, err)
+		newID := uuid.New()
+		if writeErr := os.WriteFile(idPath, newID[:], 0644); writeErr != nil {
+			return uuid.Nil, fmt.Errorf("could not write new volume.id file: %w", writeErr)
 		}
-		return volumeServerId, nil
+		return newID, nil
 	}
 
-	// Handle other errors
-	return uuid.Nil, fmt.Errorf("failed reading volume.id file %s: %v", volumeServerIdPath, err)
+	return uuid.Nil, fmt.Errorf("could not read volume.id file: %w", err)
 }

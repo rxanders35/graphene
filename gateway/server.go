@@ -32,12 +32,12 @@ func NewGatewayServer(gatewayAddr string, h *GatewayHandler) (*GatewayServer, er
 func (g *GatewayServer) registerRoutes() {
 	v1 := g.engine.Group("/v1")
 
-	volume := v1.Group("/gateway")
+	gateway := v1.Group("/gateway")
 
-	volume.POST("/write", g.gatewayHandler.Write)
-	//Encapsulates the entire write flow (req Master for volume addr -> use the volume addr to call the volume server's /write -> Write())
-	volume.GET("/read/:object_name", g.gatewayHandler.Read) //need to abrtract uuid from user (object_name -> object's uuid)
-	//Encapsulates the entire read flow (req Master for volume addr -> use the volume addr to call the volume server's /read/:uuid-> Read())
+	gateway.POST("/write", g.gatewayHandler.Write)
+	// Encapsulates the entire write flow (req Master for volume addr -> forward to volume server)
+	gateway.GET("/read/:fat_id", g.gatewayHandler.Read)
+	// Encapsulates the entire read flow (parse fat_id -> req Master for volume addr -> forward to volume server)
 }
 
 func (g *GatewayServer) Run() error {
@@ -48,9 +48,9 @@ func (g *GatewayServer) Run() error {
 	return g.srv.ListenAndServe()
 }
 
-func (h *GatewayServer) Shutdown(ctx context.Context) error {
-	if h.srv == nil {
+func (g *GatewayServer) Shutdown(ctx context.Context) error {
+	if g.srv == nil {
 		return nil
 	}
-	return h.srv.Shutdown(ctx)
+	return g.srv.Shutdown(ctx)
 }

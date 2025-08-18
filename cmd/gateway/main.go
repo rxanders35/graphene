@@ -15,7 +15,7 @@ import (
 
 func main() {
 	masterAddr := flag.String("master-addr", "localhost:9090", "master's grpc address")
-	gatewayAddr := flag.String("volume-addr", "localhost:8080", "volume's http address")
+	gatewayAddr := flag.String("gateway-addr", "127.0.0.1:8081", "gateway's http address")
 
 	flag.Parse()
 

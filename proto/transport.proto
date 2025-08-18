@@ -2,11 +2,12 @@ syntax = "proto3";
 
 package cluster;
 
-option go_package = "github.com/rxanders35/sss/transport";
+option go_package = "github.com/rxanders35/sss/proto";
 
 service MasterService {
   rpc RegisterVolume(RegisterVolumeRequest) returns (RegisterVolumeResponse);
   rpc AssignVolume(AssignVolumeRequest) returns (AssignVolumeResponse);
+  rpc GetVolumeLocation(GetVolumeLocationRequest) returns (GetVolumeLocationResponse);
 }
 
 message RegisterVolumeRequest {
@@ -16,10 +17,17 @@ message RegisterVolumeRequest {
 
 message RegisterVolumeResponse {}
 
-// make rpcs for gateway client -> master
 message AssignVolumeRequest {}
 
 message AssignVolumeResponse {
-    string http_address = 1;
-    bytes volume_id = 2;
+  string http_address = 1;
+  bytes volume_id = 2;
+}
+
+message GetVolumeLocationRequest {
+  bytes volume_id = 1;
+}
+
+message GetVolumeLocationResponse {
+  string http_address = 1;
 }

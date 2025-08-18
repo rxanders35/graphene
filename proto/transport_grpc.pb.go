@@ -4,7 +4,7 @@
 // - protoc             v5.29.3
 // source: proto/transport.proto
 
-package transport
+package proto
 
 import (
 	context "context"
@@ -24,6 +24,7 @@ const _ = grpc.SupportPackageIsVersion7
 type MasterServiceClient interface {
 	RegisterVolume(ctx context.Context, in *RegisterVolumeRequest, opts ...grpc.CallOption) (*RegisterVolumeResponse, error)
 	AssignVolume(ctx context.Context, in *AssignVolumeRequest, opts ...grpc.CallOption) (*AssignVolumeResponse, error)
+	GetVolumeLocation(ctx context.Context, in *GetVolumeLocationRequest, opts ...grpc.CallOption) (*GetVolumeLocationResponse, error)
 }
 
 type masterServiceClient struct {
@@ -52,12 +53,22 @@ func (c *masterServiceClient) AssignVolume(ctx context.Context, in *AssignVolume
 	return out, nil
 }
 
+func (c *masterServiceClient) GetVolumeLocation(ctx context.Context, in *GetVolumeLocationRequest, opts ...grpc.CallOption) (*GetVolumeLocationResponse, error) {
+	out := new(GetVolumeLocationResponse)
+	err := c.cc.Invoke(ctx, "/cluster.MasterService/GetVolumeLocation", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MasterServiceServer is the server API for MasterService service.
 // All implementations must embed UnimplementedMasterServiceServer
 // for forward compatibility
 type MasterServiceServer interface {
 	RegisterVolume(context.Context, *RegisterVolumeRequest) (*RegisterVolumeResponse, error)
 	AssignVolume(context.Context, *AssignVolumeRequest) (*AssignVolumeResponse, error)
+	GetVolumeLocation(context.Context, *GetVolumeLocationRequest) (*GetVolumeLocationResponse, error)
 	mustEmbedUnimplementedMasterServiceServer()
 }
 
@@ -70,6 +81,9 @@ func (UnimplementedMasterServiceServer) RegisterVolume(context.Context, *Registe
 }
 func (UnimplementedMasterServiceServer) AssignVolume(context.Context, *AssignVolumeRequest) (*AssignVolumeResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AssignVolume not implemented")
+}
+func (UnimplementedMasterServiceServer) GetVolumeLocation(context.Context, *GetVolumeLocationRequest) (*GetVolumeLocationResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetVolumeLocation not implemented")
 }
 func (UnimplementedMasterServiceServer) mustEmbedUnimplementedMasterServiceServer() {}
 
@@ -120,6 +134,24 @@ func _MasterService_AssignVolume_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MasterService_GetVolumeLocation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetVolumeLocationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MasterServiceServer).GetVolumeLocation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/cluster.MasterService/GetVolumeLocation",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MasterServiceServer).GetVolumeLocation(ctx, req.(*GetVolumeLocationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // MasterService_ServiceDesc is the grpc.ServiceDesc for MasterService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -134,6 +166,10 @@ var MasterService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "AssignVolume",
 			Handler:    _MasterService_AssignVolume_Handler,
+		},
+		{
+			MethodName: "GetVolumeLocation",
+			Handler:    _MasterService_GetVolumeLocation_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -14,7 +14,7 @@ type MasterClient struct {
 	Client     pb.MasterServiceClient
 }
 
-func NewMasterClient(m string) *MasterClient {
+func NewMasterClient(m string) (*MasterClient, error) {
 	conn, err := grpc.NewClient(m, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Printf("Failed dialing master. Why: %v", err)
@@ -26,5 +26,5 @@ func NewMasterClient(m string) *MasterClient {
 		Client:     pb.NewMasterServiceClient(conn),
 	}
 
-	return c
+	return c, nil
 }
