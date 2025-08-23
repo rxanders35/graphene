@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/rxanders35/graphene/gateway"
+	"github.com/rxanders35/graphene/pkg/gateway"
 )
 
 func main() {
@@ -23,12 +23,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to init master client on API gateway. Why: %v", err)
 	}
-	h, err := gateway.NewGatewayHandler(m)
 
+	h, err := gateway.NewGatewayHandler(m)
 	s, err := gateway.NewGatewayServer(*gatewayAddr, h)
 	if err != nil {
 		log.Fatalf("Failed to init API gateway. Why: %v", err)
 	}
+
 	go func() {
 		if err := s.Run(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("server run error. Why: %v", err)

@@ -2,7 +2,7 @@ package volume_server
 
 import "github.com/google/uuid"
 
-type Storage interface {
-	Write(data []byte) (uuid.UUID, error)
+type StorageEngine interface {
+	Write(id uuid.UUID, data []byte) error
 	Read(id uuid.UUID) ([]byte, error)
 }

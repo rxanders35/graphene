@@ -13,7 +13,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/rxanders35/graphene/volume_server"
+	"github.com/rxanders35/graphene/pkg/volume_server"
+	"github.com/rxanders35/graphene/pkg/volume_server/needle"
 )
 
 func main() {
@@ -28,7 +29,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	volume, err := volume_server.NewNeedleVolume(*dataDir, serverId)
+	volume, err := needle.NewVolume(*dataDir, serverId)
 	if err != nil {
 		log.Fatalf("Couldn't init volume backend. Why: %v", err)
 	}

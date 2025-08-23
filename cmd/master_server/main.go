@@ -4,7 +4,7 @@ import (
 	"flag"
 	"log"
 
-	"github.com/rxanders35/graphene/master_server"
+	"github.com/rxanders35/graphene/pkg/master_server"
 )
 
 func main() {

@@ -15,32 +15,30 @@ type Server struct {
 }
 
 type HTTPServer struct {
-	addr          string
-	volume        *NeedleVolume
-	engine        *gin.Engine
-	volumeHandler VolumeHandler
-	srv           *http.Server
-	grpcClient    *MasterClient
+	volumeHTTPaddr string
+	engine         *gin.Engine
+	handler        *VolumeHandler
+	srv            *http.Server
+	grpcClient     *MasterClient
 }
 
-func NewHTTPServer(volumeHTTPaddr string, v *NeedleVolume, m *MasterClient, volServerID uuid.UUID) (*HTTPServer, error) {
+func NewHTTPServer(v string, s StorageEngine, m *MasterClient, volSrvID uuid.UUID) (*HTTPServer, error) {
 	engine := gin.New()
 	engine.Use(gin.Logger(), gin.Recovery())
 
-	handler := VolumeHandler{needleVolume: v}
+	handler := NewVolumeHandler(s)
 
 	h := &HTTPServer{
-		addr:          volumeHTTPaddr,
-		volume:        v,
-		engine:        engine,
-		volumeHandler: handler,
-		grpcClient:    m,
+		volumeHTTPaddr: v,
+		engine:         engine,
+		handler:        handler,
+		grpcClient:     m,
 	}
 	h.registerRoutes()
 
 	req := &pb.RegisterVolumeRequest{
-		HttpAddress: volumeHTTPaddr,
-		VolumeId:    volServerID[:],
+		HttpAddress: v,
+		VolumeId:    volSrvID[:],
 	}
 
 	m.Client.RegisterVolume(context.Background(), req, grpc.WaitForReady(true))
@@ -53,13 +51,13 @@ func (h *HTTPServer) registerRoutes() {
 
 	volume := v1.Group("/volume")
 
-	volume.POST("/write", h.volumeHandler.Write)
-	volume.GET("/read/:uuid", h.volumeHandler.Read)
+	volume.POST("/write", h.handler.Write)
+	volume.GET("/read/:uuid", h.handler.Read)
 }
 
 func (h *HTTPServer) Run() error {
 	h.srv = &http.Server{
-		Addr:    h.addr,
+		Addr:    h.volumeHTTPaddr,
 		Handler: h.engine,
 	}
 	return h.srv.ListenAndServe()

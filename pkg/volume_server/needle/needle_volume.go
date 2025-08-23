@@ -1,4 +1,4 @@
-package volume_server
+package needle
 
 import (
 	"encoding/binary"
@@ -16,7 +16,7 @@ import (
 
 var rwrwrw int = 0666
 
-type NeedleVolume struct {
+type Volume struct {
 	volumeID [16]byte
 	idxFile  *os.File
 	dataFile *os.File
@@ -24,7 +24,7 @@ type NeedleVolume struct {
 	rw       sync.RWMutex
 }
 
-func NewNeedleVolume(path string, volumeID [16]byte) (*NeedleVolume, error) {
+func NewVolume(path string, volumeID [16]byte) (*Volume, error) {
 	if err := os.MkdirAll(path, 0755); err != nil {
 		return nil, fmt.Errorf("could not create data directory: %w", err)
 	}
@@ -48,7 +48,7 @@ func NewNeedleVolume(path string, volumeID [16]byte) (*NeedleVolume, error) {
 		return nil, err
 	}
 
-	return &NeedleVolume{
+	return &Volume{
 		volumeID: volumeID,
 		idxFile:  idxFile,
 		dataFile: dataFile,
@@ -56,15 +56,13 @@ func NewNeedleVolume(path string, volumeID [16]byte) (*NeedleVolume, error) {
 	}, nil
 }
 
-func (v *NeedleVolume) Write(data []byte) (uuid.UUID, error) {
+func (v *Volume) Write(needleId uuid.UUID, data []byte) error {
 	v.rw.Lock()
 	defer v.rw.Unlock()
 
-	needleId := uuid.New()
-
 	info, err := v.dataFile.Stat()
 	if err != nil {
-		return needleId, err
+		return err
 	}
 
 	offset := info.Size()
@@ -80,7 +78,7 @@ func (v *NeedleVolume) Write(data []byte) (uuid.UUID, error) {
 	binary.BigEndian.PutUint32(newNeedleBuffer[22+len(data):], checksum)
 
 	if _, err := v.dataFile.Write(newNeedleBuffer); err != nil {
-		return needleId, err
+		return err
 	}
 
 	idxBuf := make([]byte, IdxEntryTotalSize)
@@ -89,7 +87,7 @@ func (v *NeedleVolume) Write(data []byte) (uuid.UUID, error) {
 	binary.BigEndian.PutUint32(idxBuf[24:28], uint32(len(data)))
 
 	if _, err := v.idxFile.Write(idxBuf); err != nil {
-		return needleId, err
+		return err
 	}
 
 	v.idxMap[needleId] = IndexEntry{
@@ -97,11 +95,11 @@ func (v *NeedleVolume) Write(data []byte) (uuid.UUID, error) {
 		Size:   uint32(len(data)),
 	}
 
-	return needleId, nil
+	return nil
 
 }
 
-func (v *NeedleVolume) Read(id uuid.UUID) ([]byte, error) {
+func (v *Volume) Read(id uuid.UUID) ([]byte, error) {
 	v.rw.RLock()
 	defer v.rw.RUnlock()
 

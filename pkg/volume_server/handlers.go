@@ -9,7 +9,13 @@ import (
 )
 
 type VolumeHandler struct {
-	needleVolume *NeedleVolume
+	storage StorageEngine
+}
+
+func NewVolumeHandler(s StorageEngine) *VolumeHandler {
+	return &VolumeHandler{
+		storage: s,
+	}
 }
 
 func (v *VolumeHandler) Write(c *gin.Context) {
@@ -18,7 +24,8 @@ func (v *VolumeHandler) Write(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid req body"})
 		return
 	}
-	needleId, err := v.needleVolume.Write(data)
+	needleId := uuid.New()
+	err = v.storage.Write(needleId, data)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to write"})
 		return
@@ -34,7 +41,7 @@ func (v *VolumeHandler) Read(c *gin.Context) {
 		return
 	}
 
-	data, err := v.needleVolume.Read(uuid)
+	data, err := v.storage.Read(uuid)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read"})
 		return
