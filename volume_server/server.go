@@ -16,18 +16,18 @@ type Server struct {
 
 type HTTPServer struct {
 	addr          string
-	volume        *Volume
+	volume        *NeedleVolume
 	engine        *gin.Engine
 	volumeHandler VolumeHandler
 	srv           *http.Server
 	grpcClient    *MasterClient
 }
 
-func NewHTTPServer(volumeHTTPaddr string, v *Volume, m *MasterClient, volServerID uuid.UUID) (*HTTPServer, error) {
+func NewHTTPServer(volumeHTTPaddr string, v *NeedleVolume, m *MasterClient, volServerID uuid.UUID) (*HTTPServer, error) {
 	engine := gin.New()
 	engine.Use(gin.Logger(), gin.Recovery())
 
-	handler := VolumeHandler{volume: v}
+	handler := VolumeHandler{needleVolume: v}
 
 	h := &HTTPServer{
 		addr:          volumeHTTPaddr,

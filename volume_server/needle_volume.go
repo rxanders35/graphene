@@ -16,7 +16,7 @@ import (
 
 var rwrwrw int = 0666
 
-type Volume struct {
+type NeedleVolume struct {
 	volumeID [16]byte
 	idxFile  *os.File
 	dataFile *os.File
@@ -24,7 +24,7 @@ type Volume struct {
 	rw       sync.RWMutex
 }
 
-func NewVolume(path string, volumeID [16]byte) (*Volume, error) {
+func NewNeedleVolume(path string, volumeID [16]byte) (*NeedleVolume, error) {
 	if err := os.MkdirAll(path, 0755); err != nil {
 		return nil, fmt.Errorf("could not create data directory: %w", err)
 	}
@@ -48,7 +48,7 @@ func NewVolume(path string, volumeID [16]byte) (*Volume, error) {
 		return nil, err
 	}
 
-	return &Volume{
+	return &NeedleVolume{
 		volumeID: volumeID,
 		idxFile:  idxFile,
 		dataFile: dataFile,
@@ -56,53 +56,7 @@ func NewVolume(path string, volumeID [16]byte) (*Volume, error) {
 	}, nil
 }
 
-func loadIndex(file *os.File) (map[[16]byte]IndexEntry, error) {
-	idxMap := make(map[[16]byte]IndexEntry)
-
-	info, err := file.Stat()
-	if err != nil {
-		return nil, err
-	}
-	idxSize := info.Size()
-	if idxSize%IdxEntryTotalSize != 0 {
-		return nil, errors.New("Index file corrupted: not evenly divisible by 28")
-	}
-
-	numEntries := int(idxSize) / IdxEntryTotalSize
-	entryBuf := make([]byte, IdxEntryTotalSize)
-
-	for i := 0; i < numEntries; i++ {
-		_, err := io.ReadFull(file, entryBuf)
-		if err != nil {
-			return nil, err
-		}
-		id, entry, err := decodeEntry(entryBuf)
-		if err != nil {
-			return nil, errors.New("Massive issue decoding index data into its tracker map fields")
-		}
-
-		idxMap[id] = entry
-
-	}
-	return idxMap, nil
-}
-
-func decodeEntry(buf []byte) ([16]byte, IndexEntry, error) {
-	if len(buf) != IdxEntryTotalSize {
-		return uuid.UUID{}, IndexEntry{}, io.ErrUnexpectedEOF
-	}
-
-	var id uuid.UUID
-	copy(id[:], buf[0:16])
-
-	var entry IndexEntry
-	entry.Offset = binary.BigEndian.Uint64(buf[16:24])
-	entry.Size = binary.BigEndian.Uint32(buf[24:28])
-
-	return id, entry, nil
-}
-
-func (v *Volume) Write(data []byte) (uuid.UUID, error) {
+func (v *NeedleVolume) Write(data []byte) (uuid.UUID, error) {
 	v.rw.Lock()
 	defer v.rw.Unlock()
 
@@ -147,7 +101,7 @@ func (v *Volume) Write(data []byte) (uuid.UUID, error) {
 
 }
 
-func (v *Volume) Read(id [16]byte) ([]byte, error) {
+func (v *NeedleVolume) Read(id uuid.UUID) ([]byte, error) {
 	v.rw.RLock()
 	defer v.rw.RUnlock()
 
@@ -175,4 +129,50 @@ func (v *Volume) Read(id [16]byte) ([]byte, error) {
 	}
 
 	return data, nil
+}
+
+func loadIndex(file *os.File) (map[[16]byte]IndexEntry, error) {
+	idxMap := make(map[[16]byte]IndexEntry)
+
+	info, err := file.Stat()
+	if err != nil {
+		return nil, err
+	}
+	idxSize := info.Size()
+	if idxSize%IdxEntryTotalSize != 0 {
+		return nil, errors.New("index file corrupted: not evenly divisible by 28")
+	}
+
+	numEntries := int(idxSize) / IdxEntryTotalSize
+	entryBuf := make([]byte, IdxEntryTotalSize)
+
+	for i := 0; i < numEntries; i++ {
+		_, err := io.ReadFull(file, entryBuf)
+		if err != nil {
+			return nil, err
+		}
+		id, entry, err := decodeEntry(entryBuf)
+		if err != nil {
+			return nil, errors.New("massive issue decoding index data into its tracker map fields")
+		}
+
+		idxMap[id] = entry
+
+	}
+	return idxMap, nil
+}
+
+func decodeEntry(buf []byte) ([16]byte, IndexEntry, error) {
+	if len(buf) != IdxEntryTotalSize {
+		return uuid.UUID{}, IndexEntry{}, io.ErrUnexpectedEOF
+	}
+
+	var id uuid.UUID
+	copy(id[:], buf[0:16])
+
+	var entry IndexEntry
+	entry.Offset = binary.BigEndian.Uint64(buf[16:24])
+	entry.Size = binary.BigEndian.Uint32(buf[24:28])
+
+	return id, entry, nil
 }

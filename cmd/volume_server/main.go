@@ -28,7 +28,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	volume, err := volume_server.NewVolume(*dataDir, serverId)
+	volume, err := volume_server.NewNeedleVolume(*dataDir, serverId)
 	if err != nil {
 		log.Fatalf("Couldn't init volume backend. Why: %v", err)
 	}

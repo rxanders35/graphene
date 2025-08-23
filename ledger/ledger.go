@@ -11,11 +11,13 @@ func NewLedger() *Ledger {
 	return l
 }
 
-type Store struct {
+type Store interface{}
+
+type PGStore struct {
 	db *sqlx.DB
 }
 
-func NewStore() *Store {
-	s := &Store{}
+func NewPGStore() *PGStore {
+	s := &PGStore{}
 	return s
 }

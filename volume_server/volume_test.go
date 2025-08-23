@@ -10,7 +10,7 @@ import (
 func TestVolume_WriteRead(t *testing.T) {
 	tempDir := t.TempDir()
 	volumeID := uuid.New()
-	v, err := NewVolume(tempDir, volumeID)
+	v, err := NewNeedleVolume(tempDir, volumeID)
 	if err != nil {
 		t.Fatalf("Failed to create new volume: %v", err)
 	}
@@ -33,7 +33,7 @@ func TestVolume_WriteRead(t *testing.T) {
 	v.dataFile.Close()
 	v.idxFile.Close()
 
-	reloadedVolume, err := NewVolume(tempDir, volumeID)
+	reloadedVolume, err := NewNeedleVolume(tempDir, volumeID)
 	if err != nil {
 		t.Fatalf("Failed to reload volume from disk: %v", err)
 	}

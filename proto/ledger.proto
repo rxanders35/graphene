@@ -4,30 +4,64 @@ package cluster;
 
 option go_package = "github.com/rxanders35/sss/proto";
 
+import "google/protobuf/timestamp.proto";
+
 service LedgerService {
-    // requests location from the master
-    rpc PrepareWrite(PrepareWriteRequest) returns (PrepareWriteResponse);
+  // asks for a place to upload a new object (Ledger -> Master)
+  rpc PrepareWrite(PrepareWriteRequest) returns (PrepareWriteResponse);
 
-    // commits and confirms metadata pertaining to upload upon receiving object (needle) ID from volume
-    rpc Apply(ApplyRequest) returns (ApplyResponse);
+  // commits metadata after a successful upload to a volume Server
+  rpc Apply(ApplyRequest) returns (ApplyResponse);
 
-    // queries backend (Postgres or CockroachDB) for exact object location
-    rpc GetObjectLocation(GetObjectLocationRequest) returns (GetObjectLocationResponse);
+  // gets all the info needed to download an object
+  rpc GetObjectLocation(GetObjectLocationRequest) returns (GetObjectLocationResponse);
 
-    // marks object on for garbage collection
-    // rpc DeleteObject(DeleteObjectRequest) returns (DeleteObjectResponse);
+  // marks an object for deletion
+  rpc DeleteObject(DeleteObjectRequest) returns (DeleteObjectResponse);
 
-    // queries a list of objects
-    // rpc ListObjects(ListObjectsRequest) returns (ListObjectsResponse);
+  // queries a list of objects in a bucket
+  // rpc ListObjects(ListObjectsRequest) returns (ListObjectsResponse);
 }
 
 message PrepareWriteRequest {
-    string bucket = 1;
-    string path = 2;
+  string bucket = 1;
+  string path = 2;
 }
 
-message PrepareUploadResponse{}
+message PrepareWriteResponse {
+  string volume_id = 1;
+  string http_address = 2;
+}
 
 message ApplyRequest {
-
+  string bucket = 1;
+  string path = 2;
+  string volume_id = 3;
+  string needle_id = 4;
+  int64 size_bytes = 5;
+  string mime_type = 6;
 }
+
+message ApplyResponse {}
+
+message GetObjectLocationRequest {
+  string bucket = 1;
+  string path = 2;
+}
+
+message GetObjectLocationResponse {
+  string http_address = 1;
+  string needle_id = 2;
+}
+
+message DeleteObjectRequest {
+  string bucket = 1;
+  string path = 2;
+}
+
+message DeleteObjectResponse {}
+
+/*
+message ListObjectsRequest {}
+message ListObjectsResponse {}
+*/
