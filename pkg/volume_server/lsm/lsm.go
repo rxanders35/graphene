@@ -12,11 +12,17 @@ type LSM struct {
 	opts *pebble.Options
 }
 
+const (
+	_128MiB = 128 << 20
+	_64MiB  = 64 << 20
+	_1MiB   = 1 << 20
+)
+
 func NewLSM(path string, opts ...Option) *LSM {
 	defaultOpts := &pebble.Options{
-		Cache:        pebble.NewCache(128 << 20),
-		MemTableSize: 64 << 20,
-		BytesPerSync: 1 << 20,
+		Cache:        pebble.NewCache(_128MiB),
+		MemTableSize: _64MiB,
+		BytesPerSync: _1MiB,
 	}
 
 	l := &LSM{
