@@ -4,7 +4,7 @@ import (
 	"flag"
 	"log"
 
-	"github.com/rxanders35/graphene/pkg/master_server"
+	"github.com/rxanders35/graphene/pkg/cluster_manager"
 )
 
 func main() {
@@ -13,6 +13,6 @@ func main() {
 	flag.Parse()
 	log.Printf("Starting")
 
-	s := master_server.NewGRPCServer(*masterAddr)
+	s := cluster_manager.NewGRPCServer(*masterAddr)
 	s.Run()
 }

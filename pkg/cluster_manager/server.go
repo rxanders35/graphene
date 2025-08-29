@@ -1,4 +1,4 @@
-package master_server
+package cluster_manager
 
 import (
 	"context"
